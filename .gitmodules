@@ -1,0 +1,12 @@
+[submodule "ubuntu-mise"]
+	path = ubuntu-mise
+	url = git@github.com:Ruby-on-Rails-Wizardry/ubuntu-mise.git
+	branch = master
+[submodule "alpine-mise"]
+	path = alpine-mise
+	url = git@github.com:Ruby-on-Rails-Wizardry/alpine-mise.git
+	branch = master
+[submodule "arch-mise"]
+	path = arch-mise
+	url = git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git
+	branch = master
