@@ -37,14 +37,20 @@ See each submodule’s `README.md` for Task / Compose / cache details.
 | Name | Role | URL |
 |------|------|-----|
 | **github** | default | `git@github.com:Ruby-on-Rails-Wizardry/docker-mise.git` |
+| **gitlab** | backup | `git@gitlab.com:ruby-on-rails-wizardry/docker-mise.git` |
 
 ```bash
 git remote -v
-git push -u github master
+git push github master
+git push gitlab master
 ```
 
-Flavor repos also have a **gitlab** backup remote; run `./bin/setup-remotes` inside a submodule after cloning.
+Flavor repos also use **github** (default) + **gitlab** (backup). After cloning a submodule, run `./bin/setup-remotes` inside it (submodule checkout often only has `origin`).
+
+## Maintaining
+
+For periodic upkeep (rebuilds, doc sync across flavors, dual-push, submodule pins), see **[MAINTAINING.md](./MAINTAINING.md)** and each flavor’s `AGENTS.md` maintainer section.
 
 ## Agent notes
 
-See [AGENTS.md](./AGENTS.md).
+See [AGENTS.md](./AGENTS.md). Follow [MAINTAINING.md](./MAINTAINING.md) for maintenance tasks.

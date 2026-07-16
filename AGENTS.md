@@ -6,11 +6,17 @@ Umbrella repository for mise base development images. Flavors live as **git subm
 **Default branch:** `master`  
 **Last updated:** 2026-07-16
 
+## Maintainer / agent notes
+
+Periodic upkeep (remotes, doc sync, verify, submodule pins) is documented in **[MAINTAINING.md](./MAINTAINING.md)**.  
+When maintaining, follow that checklist and dual-push **github** + **gitlab**.
+
 ## Layout
 
 ```
 docker-mise/
 ├── AGENTS.md
+├── MAINTAINING.md   # maintainer checklist (humans + agents)
 ├── README.md
 ├── ubuntu-mise/   # submodule → Ruby-on-Rails-Wizardry/ubuntu-mise
 ├── alpine-mise/   # submodule → Ruby-on-Rails-Wizardry/alpine-mise
@@ -31,7 +37,8 @@ Update pins: `git submodule update --remote --merge` (then commit parent).
 
 ## Per-flavor remotes
 
-Inside each submodule, **github** is default and **gitlab** is backup (`./bin/setup-remotes`).
+Inside each submodule, **github** is default and **gitlab** is backup (`./bin/setup-remotes`).  
+Umbrella remotes: **github** + **gitlab** (`docker-mise`).
 
 ## Host UX (inside a flavor)
 
