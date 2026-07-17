@@ -51,6 +51,13 @@ Flavor repos also use **github** (default) + **gitlab** (backup). After cloning 
 
 For periodic upkeep (rebuilds, doc sync across flavors, dual-push, submodule pins), see **[MAINTAINING.md](./MAINTAINING.md)** and each flavor’s `AGENTS.md` maintainer section.
 
+## Releases
+
+Versioned shipping (coordinated flavor tags + GitHub Releases + umbrella pins): **[docs/RELEASE.md](./docs/RELEASE.md)**.  
+History: [CHANGELOG.md](./CHANGELOG.md) (umbrella); each flavor has its own changelog.
+
+Agent/human shortcuts: **send it**, **ship it**, or **cut a release** mean run that process end-to-end.
+
 ## Agent notes
 
-See [AGENTS.md](./AGENTS.md). Follow [MAINTAINING.md](./MAINTAINING.md) for maintenance tasks.
+See [AGENTS.md](./AGENTS.md). Follow [MAINTAINING.md](./MAINTAINING.md) for maintenance; [docs/RELEASE.md](./docs/RELEASE.md) for releases.

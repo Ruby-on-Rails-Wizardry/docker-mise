@@ -8,8 +8,20 @@ Umbrella repository for mise base development images. Flavors live as **git subm
 
 ## Maintainer / agent notes
 
-Periodic upkeep (remotes, doc sync, verify, submodule pins) is documented in **[MAINTAINING.md](./MAINTAINING.md)**.  
-When maintaining, follow that checklist and dual-push **github** + **gitlab**.
+| Intent | Doc |
+|--------|-----|
+| Periodic upkeep (remotes, doc sync, verify, pins without a version) | **[MAINTAINING.md](./MAINTAINING.md)** |
+| Versioned shipping (tags, GitHub Releases, coordinated pins) | **[docs/RELEASE.md](./docs/RELEASE.md)** |
+
+When maintaining, follow MAINTAINING and dual-push **github** + **gitlab**.  
+When releasing, follow RELEASE **end-to-end** (do not stop after push alone).
+
+### Phrase shortcuts
+
+| Phrase | Means |
+|--------|--------|
+| **send it** / **ship it** / **cut a release** | Follow [docs/RELEASE.md](./docs/RELEASE.md) **end-to-end**: verify → sync flavors → changelog → commit → annotated tag → dual-push master + tag → **`gh release create` on each shipping flavor (required)** → pin umbrella → dual-push umbrella. Do **not** stop after push alone. |
+| **maintain** / **sync** / **refresh docs** | [MAINTAINING.md](./MAINTAINING.md) only — no version cut unless also releasing |
 
 ## Layout
 
@@ -17,6 +29,9 @@ When maintaining, follow that checklist and dual-push **github** + **gitlab**.
 docker-mise/
 ├── AGENTS.md
 ├── MAINTAINING.md   # maintainer checklist (humans + agents)
+├── CHANGELOG.md     # umbrella pins / umbrella-only notes
+├── docs/
+│   └── RELEASE.md   # coordinated release checklist
 ├── README.md
 ├── ubuntu-mise/   # submodule → Ruby-on-Rails-Wizardry/ubuntu-mise
 ├── alpine-mise/   # submodule → Ruby-on-Rails-Wizardry/alpine-mise

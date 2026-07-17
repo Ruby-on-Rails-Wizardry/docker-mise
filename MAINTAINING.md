@@ -3,6 +3,7 @@
 Notes for **humans and agents** who periodically keep these repos healthy.
 Default remote is **`github`**; **`gitlab`** is backup on every repo.
 
+**Maintain vs release:** this file is for remotes, mirrors, rebuild hygiene, and doc sync **without** cutting a version. For versioned shipping (semver tags, GitHub Releases, coordinated submodule pins), see **[docs/RELEASE.md](./docs/RELEASE.md)**.
 ## Repos
 
 | Repo | Role | GitHub | GitLab |
@@ -76,7 +77,9 @@ cd ubuntu-mise && task build && task verify && task doctor
 # repeat for alpine-mise / arch-mise when practical
 ```
 
-### 4. Publish
+### 4. Publish (non-versioned)
+
+For day-to-day pushes without a version cut:
 
 ```bash
 # inside a flavor
@@ -90,6 +93,7 @@ git push github master
 git push gitlab master
 ```
 
+To cut a **versioned** release (changelog, tag, `gh release create`, coordinated pins), use **[docs/RELEASE.md](./docs/RELEASE.md)** instead.
 ## Agent instructions (maintainers)
 
 When asked to “maintain”, “sync”, “refresh docs”, or “check remotes”:
