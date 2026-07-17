@@ -21,7 +21,13 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Security
 
-<!-- Pin bumps: "Pin flavors to vX.Y.Z". Move into a dated section only if you cut an optional umbrella tag. -->
+<!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
+
+## 2026-07-17 — pin v0.2.0
+
+### Changed
+
+- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.2.0** (sample setup, compile toolchain, shell TTY, mise trust, shared-cache bundle clean policy)
 
 ## 2026-07-17 — pin v0.1.0
 
