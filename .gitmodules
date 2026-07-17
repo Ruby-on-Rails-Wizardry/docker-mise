@@ -10,3 +10,15 @@
 	path = arch-mise
 	url = git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git
 	branch = master
+[submodule "cluster"]
+	path = cluster
+	url = git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git
+	branch = master
+[submodule "experment"]
+	path = experment
+	url = git@github.com:capnregex/docker-bundler-yarn-cache.git
+	branch = dry-yarn-1
+[submodule "partial"]
+	path = partial
+	url = git@github.com:capnregex/docker-mise-partial.git
+	branch = master
