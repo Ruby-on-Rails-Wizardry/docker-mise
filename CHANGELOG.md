@@ -23,6 +23,13 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
+## 2026-07-23 — pin v0.3.0
+
+### Changed
+
+- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.3.0** (sample_app submodule, compose `app` service, warm language-version files)
+
+## 2026-07-17 — pin v0.2.0
 ## 2026-07-17 — pin v0.2.0
 
 ### Changed
