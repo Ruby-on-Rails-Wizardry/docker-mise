@@ -17,6 +17,8 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Changed
 
+- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.4.0**
+
 ### Fixed
 
 ### Security
