@@ -19,6 +19,7 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Changed
 
+- Pin alpine-mise to **v0.4.1** (+ AGENTS.md Alpine docs fix) — musl Ruby compile; OS-only patch skew vs ubuntu/arch at v0.4.0
 - Pin ubuntu-mise, alpine-mise, arch-mise to **v0.4.0**
 
 ### Fixed
