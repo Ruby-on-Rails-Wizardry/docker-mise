@@ -1,0 +1,365 @@
+#!/usr/bin/env bash
+# Repeatable cold/warm bring-up benchmarks for sample_app and -mise wrappers.
+#
+# Usage:
+#   bench/bin/run-speed-tests              # all scenarios, cold then warm each
+#   bench/bin/run-speed-tests --only prod,ubuntu-mise
+#   bench/bin/run-speed-tests --phase cold
+#   SAMPLE_APP=/path/to/sample_app bench/bin/run-speed-tests
+#
+# Writes: bench/results/<run_id>.yaml and bench/SPEED.md
+set -euo pipefail
+
+BENCH_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../lib/common.sh
+source "${BENCH_BIN}/../lib/common.sh"
+
+ONLY=""
+PHASES="cold warm"
+LIST=0
+
+usage() {
+  sed -n '2,12p' "$0" | sed 's/^# //;s/^#//'
+  exit "${1:-0}"
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h|--help) usage 0 ;;
+    --only) ONLY="${2:-}"; shift 2 ;;
+    --phase) PHASES="${2:-}"; shift 2 ;;
+    --list) LIST=1; shift ;;
+    --sample-app) SAMPLE_APP="${2:-}"; shift 2 ;;
+    *) die "unknown arg: $1" ;;
+  esac
+done
+
+ALL_SCENARIOS=(
+  sample_app_production
+  sample_app_development
+  ubuntu-mise
+  alpine-mise
+  arch-mise
+)
+
+if [[ "${LIST}" == "1" ]]; then
+  printf '%s\n' "${ALL_SCENARIOS[@]}"
+  exit 0
+fi
+
+selected=()
+if [[ -z "${ONLY}" ]]; then
+  selected=("${ALL_SCENARIOS[@]}")
+else
+  IFS=',' read -r -a want <<<"${ONLY}"
+  for s in "${want[@]}"; do
+    s="$(echo "${s}" | xargs)" # trim
+    # aliases
+    case "${s}" in
+      prod|production) s=sample_app_production ;;
+      dev|development) s=sample_app_development ;;
+      ubuntu) s=ubuntu-mise ;;
+      alpine) s=alpine-mise ;;
+      arch) s=arch-mise ;;
+    esac
+    selected+=("${s}")
+  done
+fi
+
+require_tools
+RUN_ID="${RUN_ID:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+export RUN_ID SAMPLE_APP RESULTS_DIR
+mkdir -p "${RESULTS_DIR}"
+log "run_id=${RUN_ID}"
+log "sample_app=${SAMPLE_APP}"
+log "results=${RESULTS_DIR}/${RUN_ID}.yaml"
+
+# --- sample_app production ---------------------------------------------------
+
+scenario_sample_app_production() {
+  local phase="$1"
+  local start t_build t0 t_up t_root base url_up url_root
+  base="http://127.0.0.1:${PORT_PROD}"
+  url_up="${base}/up"
+  url_root="${base}/"
+
+  log "== sample_app_production / ${phase} =="
+  docker_rm_ctr "${CTR_PROD}"
+
+  if [[ "${phase}" == "cold" ]]; then
+    docker_rmi "${IMG_PROD}"
+  fi
+
+  start="$(now_epoch)"
+  t0="$(now_epoch)"
+  log "building ${IMG_PROD} (no-cache=$([[ ${phase} == cold ]] && echo yes || echo no))"
+  if [[ "${phase}" == "cold" ]]; then
+    docker build --no-cache -t "${IMG_PROD}" "${SAMPLE_APP}"
+  else
+    docker build -t "${IMG_PROD}" "${SAMPLE_APP}"
+  fi
+  t_build="$(elapsed_s "${t0}")"
+
+  log "running container on :${PORT_PROD}"
+  docker run -d \
+    --name "${CTR_PROD}" \
+    -p "${PORT_PROD}:80" \
+    -e "RAILS_ENV=production" \
+    -e "SECRET_KEY_BASE=${BENCH_SECRET_KEY_BASE}" \
+    "${IMG_PROD}" >/dev/null
+
+  t_up="$(wait_http "${url_up}" "${start}")" || {
+    docker logs "${CTR_PROD}" 2>&1 | tail -40 >&2 || true
+    docker_rm_ctr "${CTR_PROD}"
+    record_failure sample_app_production "${phase}" "timeout waiting for /up"
+    return 1
+  }
+  t_root="$(wait_http "${url_root}" "${start}")" || {
+    docker logs "${CTR_PROD}" 2>&1 | tail -40 >&2 || true
+    docker_rm_ctr "${CTR_PROD}"
+    record_failure sample_app_production "${phase}" "timeout waiting for /"
+    return 1
+  }
+
+  docker_rm_ctr "${CTR_PROD}"
+
+  RESULT_SCENARIO="sample_app_production" \
+  RESULT_PHASE="${phase}" \
+  RESULT_T_BUILD_S="${t_build}" \
+  RESULT_T_UP_S="${t_up}" \
+  RESULT_T_ROOT_S="${t_root}" \
+  RESULT_T_TOTAL_S="${t_root}" \
+  RESULT_PORT="${PORT_PROD}" \
+  RESULT_BASE_URL="${base}" \
+  RESULT_IMAGE="${IMG_PROD}" \
+  RESULT_CACHE_VOLUME="" \
+  RESULT_NOTES="Dockerfile final stage + Thruster; no named volume" \
+  record_success
+  log "sample_app_production/${phase}: total=${t_root}s (build=${t_build}s up=${t_up}s root=${t_root}s)"
+}
+
+# --- sample_app development (compose.dev.yml) --------------------------------
+
+scenario_sample_app_development() {
+  local phase="$1"
+  local start t_build t0 t_up t_root base override
+  local project="${COMPOSE_DEV_PROJECT}"
+  base="http://127.0.0.1:${PORT_DEV}"
+  override="${RESULTS_DIR}/.compose-dev-override-${project}.yml"
+
+  mkdir -p "${RESULTS_DIR}"
+  cat >"${override}" <<EOF
+services:
+  web:
+    image: ${IMG_DEV}
+    ports:
+      - "${PORT_DEV}:3000"
+    environment:
+      PORT: "3000"
+EOF
+
+  log "== sample_app_development / ${phase} =="
+  (
+    cd "${SAMPLE_APP}"
+    docker compose -p "${project}" -f compose.dev.yml -f "${override}" down --remove-orphans >/dev/null 2>&1 || true
+  )
+
+  if [[ "${phase}" == "cold" ]]; then
+    docker_rmi "${IMG_DEV}"
+    (
+      cd "${SAMPLE_APP}"
+      docker compose -p "${project}" -f compose.dev.yml -f "${override}" down -v --remove-orphans >/dev/null 2>&1 || true
+    )
+  fi
+
+  start="$(now_epoch)"
+  t0="$(now_epoch)"
+  log "compose build ${IMG_DEV} (development stage)"
+  (
+    cd "${SAMPLE_APP}"
+    export HOST_PORT="${PORT_DEV}"
+    if [[ "${phase}" == "cold" ]]; then
+      docker compose -p "${project}" -f compose.dev.yml -f "${override}" build --no-cache
+    else
+      docker compose -p "${project}" -f compose.dev.yml -f "${override}" build
+    fi
+  )
+  t_build="$(elapsed_s "${t0}")"
+
+  log "compose up"
+  (
+    cd "${SAMPLE_APP}"
+    export HOST_PORT="${PORT_DEV}"
+    docker compose -p "${project}" -f compose.dev.yml -f "${override}" up -d --no-build
+  )
+
+  t_up="$(wait_http "${base}/up" "${start}")" || {
+    (
+      cd "${SAMPLE_APP}"
+      docker compose -p "${project}" -f compose.dev.yml -f "${override}" logs --tail=40 >&2 || true
+      docker compose -p "${project}" -f compose.dev.yml -f "${override}" down --remove-orphans >/dev/null 2>&1 || true
+    )
+    record_failure sample_app_development "${phase}" "timeout waiting for /up"
+    return 1
+  }
+  t_root="$(wait_http "${base}/" "${start}")" || {
+    (
+      cd "${SAMPLE_APP}"
+      docker compose -p "${project}" -f compose.dev.yml -f "${override}" down --remove-orphans >/dev/null 2>&1 || true
+    )
+    record_failure sample_app_development "${phase}" "timeout waiting for /"
+    return 1
+  }
+
+  (
+    cd "${SAMPLE_APP}"
+    docker compose -p "${project}" -f compose.dev.yml -f "${override}" down --remove-orphans >/dev/null 2>&1 || true
+  )
+
+  RESULT_SCENARIO="sample_app_development" \
+  RESULT_PHASE="${phase}" \
+  RESULT_T_BUILD_S="${t_build}" \
+  RESULT_T_UP_S="${t_up}" \
+  RESULT_T_ROOT_S="${t_root}" \
+  RESULT_T_TOTAL_S="${t_root}" \
+  RESULT_PORT="${PORT_DEV}" \
+  RESULT_BASE_URL="${base}" \
+  RESULT_IMAGE="${IMG_DEV}" \
+  RESULT_CACHE_VOLUME="" \
+  RESULT_NOTES="compose.dev.yml development stage + live mount" \
+  record_success
+  log "sample_app_development/${phase}: total=${t_root}s (build=${t_build}s up=${t_up}s root=${t_root}s)"
+}
+
+# --- flavor -mise compose app ------------------------------------------------
+
+scenario_mise_flavor() {
+  local flavor="$1" phase="$2" host_port="$3"
+  local flavor_root="${UMBRELLA_ROOT}/${flavor}"
+  local image="${flavor}:bench"
+  local volume="${flavor}-bench-cache"
+  local project="${flavor}-bench"
+  local base="http://127.0.0.1:${host_port}"
+  local start t_build t0 t_up t_root
+
+  [[ -d "${flavor_root}" ]] || die "missing flavor root ${flavor_root}"
+  [[ -f "${flavor_root}/sample_app/Gemfile" ]] || die "${flavor}/sample_app missing Gemfile (init submodule)"
+
+  log "== ${flavor} / ${phase} =="
+
+  (
+    cd "${flavor_root}"
+    COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
+      SAMPLE_APP_HOST_PORT="${host_port}" SAMPLE_APP_PORT=3000 \
+      ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
+  )
+
+  if [[ "${phase}" == "cold" ]]; then
+    docker_rmi "${image}"
+    volume_rm "${volume}"
+  fi
+  volume_ensure "${volume}"
+
+  start="$(now_epoch)"
+  t0="$(now_epoch)"
+  log "building ${image}"
+  (
+    cd "${flavor_root}"
+    export IMAGE="${image}" CACHE_VOLUME="${volume}"
+    if [[ "${phase}" == "cold" ]]; then
+      DOCKER_BUILD_OPTS="--no-cache" ./bin/build
+    else
+      DOCKER_BUILD_OPTS="" ./bin/build
+    fi
+  )
+  t_build="$(elapsed_s "${t0}")"
+
+  log "compose app up"
+  (
+    cd "${flavor_root}"
+    export IMAGE="${image}" CACHE_VOLUME="${volume}"
+    export SAMPLE_APP_HOST_PORT="${host_port}" SAMPLE_APP_PORT=3000
+    export COMPOSE_PROJECT_NAME="${project}"
+    export SAMPLE_APP_DIR="${flavor_root}/sample_app"
+    ./bin/compose --profile app up -d --no-build app
+  )
+
+  t_up="$(wait_http "${base}/up" "${start}")" || {
+    (
+      cd "${flavor_root}"
+      COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
+        ./bin/compose --profile app logs app --tail=50 >&2 || true
+      COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
+        ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
+    )
+    record_failure "${flavor}" "${phase}" "timeout waiting for /up"
+    return 1
+  }
+  t_root="$(wait_http "${base}/" "${start}")" || {
+    (
+      cd "${flavor_root}"
+      COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
+        ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
+    )
+    record_failure "${flavor}" "${phase}" "timeout waiting for /"
+    return 1
+  }
+
+  (
+    cd "${flavor_root}"
+    COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
+      ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
+  )
+
+  RESULT_SCENARIO="${flavor}" \
+  RESULT_PHASE="${phase}" \
+  RESULT_T_BUILD_S="${t_build}" \
+  RESULT_T_UP_S="${t_up}" \
+  RESULT_T_ROOT_S="${t_root}" \
+  RESULT_T_TOTAL_S="${t_root}" \
+  RESULT_PORT="${host_port}" \
+  RESULT_BASE_URL="${base}" \
+  RESULT_IMAGE="${image}" \
+  RESULT_CACHE_VOLUME="${volume}" \
+  RESULT_NOTES="compose profile app; sample_app bind + ${volume}" \
+  record_success
+  log "${flavor}/${phase}: total=${t_root}s (build=${t_build}s up=${t_up}s root=${t_root}s)"
+}
+
+run_scenario() {
+  local name="$1" phase="$2"
+  case "${name}" in
+    sample_app_production) scenario_sample_app_production "${phase}" ;;
+    sample_app_development) scenario_sample_app_development "${phase}" ;;
+    ubuntu-mise) scenario_mise_flavor ubuntu-mise "${phase}" "${PORT_UBUNTU}" ;;
+    alpine-mise) scenario_mise_flavor alpine-mise "${phase}" "${PORT_ALPINE}" ;;
+    arch-mise) scenario_mise_flavor arch-mise "${phase}" "${PORT_ARCH}" ;;
+    *) die "unknown scenario: ${name}" ;;
+  esac
+}
+
+# --- main loop: each scenario cold then warm ---------------------------------
+
+IFS=' ' read -r -a phase_list <<<"${PHASES//,/ }"
+for scenario in "${selected[@]}"; do
+  for phase in "${phase_list[@]}"; do
+    phase="$(echo "${phase}" | xargs)"
+    [[ "${phase}" == "cold" || "${phase}" == "warm" ]] || die "phase must be cold or warm: ${phase}"
+    # Continue on failure so we still finish the suite and write the report.
+    run_scenario "${scenario}" "${phase}" || log "scenario failed: ${scenario}/${phase} (continuing)"
+  done
+done
+
+# Finalize yaml with finished_at
+yaml="${RESULTS_DIR}/${RUN_ID}.yaml"
+if [[ -f "${yaml}" ]]; then
+  if ! grep -q '^finished_at:' "${yaml}"; then
+    printf '\nfinished_at: "%s"\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >>"${yaml}"
+  fi
+fi
+
+report_md="${BENCH_ROOT}/SPEED.md"
+python3 "${BENCH_ROOT}/lib/report.py" "${yaml}" -o "${report_md}"
+log "wrote ${yaml}"
+log "wrote ${report_md}"
+log "done"

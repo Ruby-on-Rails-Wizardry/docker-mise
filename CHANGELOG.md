@@ -15,6 +15,8 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Added
 
+- [bench/](bench/) cold/warm Rails bring-up speed harness (`bin/run-speed-tests`) and [SPEED.md](bench/SPEED.md)
+
 ### Changed
 
 - Pin ubuntu-mise, alpine-mise, arch-mise to **v0.4.0**
