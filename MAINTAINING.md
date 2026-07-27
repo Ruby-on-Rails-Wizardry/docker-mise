@@ -4,6 +4,8 @@ Notes for **humans and agents** who periodically keep these repos healthy.
 Default remote is **`github`**; **`gitlab`** is backup on every repo.
 
 **Maintain vs release:** this file is for remotes, mirrors, rebuild hygiene, and doc sync **without** cutting a version. For versioned shipping (semver tags, GitHub Releases, coordinated submodule pins), see **[docs/RELEASE.md](./docs/RELEASE.md)**.
+
+**SSH vs HTTPS:** remotes and `.gitmodules` stay SSH. For a context that can only use HTTPS, use git `url.*.insteadOf` (not dual commits). See **[docs/CLONE-HTTPS.md](./docs/CLONE-HTTPS.md)**.
 ## Repos
 
 | Repo | Role | GitHub | GitLab |

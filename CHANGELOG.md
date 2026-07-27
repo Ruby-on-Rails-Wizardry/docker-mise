@@ -16,6 +16,8 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Added
 
+- [docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md) — keep SSH remotes/`.gitmodules` canonical; HTTPS-only contexts use git `url.*.insteadOf` (nested submodules included)
+
 ### Changed
 
 - Pin [cluster/](cluster/) after converting **fred** / **george** to app submodules ([fred](https://github.com/Ruby-on-Rails-Wizardry/fred), [george](https://github.com/Ruby-on-Rails-Wizardry/george))

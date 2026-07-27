@@ -23,6 +23,8 @@ If you already cloned without submodules:
 git submodule update --init --recursive
 ```
 
+Canonical remotes and `.gitmodules` use **SSH**. For a second machine or policy that **must use HTTPS**, keep SSH in the repos and rewrite URLs only there — see **[docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md)**.
+
 ## Use a base image
 
 ```bash
@@ -62,6 +64,8 @@ Flavor repos also use **github** (default) + **gitlab** (backup). After cloning 
 ## Maintaining
 
 For periodic upkeep (rebuilds, doc sync across flavors, dual-push, submodule pins), see **[MAINTAINING.md](./MAINTAINING.md)** and each flavor’s `AGENTS.md` maintainer section.
+
+SSH vs HTTPS dual context (same tree, different network policy): **[docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md)**.
 
 ## Releases
 
