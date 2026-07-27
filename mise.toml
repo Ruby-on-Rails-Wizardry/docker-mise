@@ -1,0 +1,8 @@
+# Host tools for the docker-mise umbrella (run from this directory).
+# Pin Task so `task …` works after `mise install` (same pin as the *-mise flavors).
+
+min_version = "2025.8.0"
+
+[tools]
+# Task (go-task) — Taskfile.yml host UX; https://taskfile.dev
+task = "3.52.0"

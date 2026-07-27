@@ -9,6 +9,23 @@ Umbrella repo for **mise** development base images. Each OS flavor is a **git su
 | [arch-mise](https://github.com/Ruby-on-Rails-Wizardry/arch-mise) | `git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git` | Arch + mise + `/cache` |
 | [cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) | `git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git` | Multi-app Rails cluster template + nginx path proxy |
 
+## Host UX (Task)
+
+[Task](https://taskfile.dev) is pinned in root [mise.toml](mise.toml) (same **3.52.0** as the `*-mise` flavors).
+
+```bash
+mise install          # installs Task
+task                  # list umbrella + included namespaces
+task setup            # mise install
+task ubuntu:setup     # flavor tasks (includes ubuntu-mise/Taskfile.yml)
+task alpine:shell
+task arch:compose:app
+task cluster:up -- fred
+task rebase-local     # HTTPS site helper (bin/rebase-local-tree)
+```
+
+Each flavor already has a full `Taskfile.yml` (`task setup` / `task shell` / `task compose:*`). Cluster and app repos have Taskfiles too. `bin/*` still works without Task.
+
 ## Clone this umbrella
 
 ```bash

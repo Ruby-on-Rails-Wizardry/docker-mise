@@ -60,6 +60,21 @@ Site-local image/proxy patches: branch **`local`** + **`bin/rebase-local-tree`**
 Inside each submodule, **github** is default and **gitlab** is backup (`./bin/setup-remotes`).  
 Umbrella remotes: **github** + **gitlab** (`docker-mise`).
 
+## Host UX (Task)
+
+| Where | How |
+|-------|-----|
+| **Umbrella** | [Taskfile.yml](Taskfile.yml) + [mise.toml](mise.toml) `task = "3.52.0"`; `task setup`, includes `ubuntu:` / `alpine:` / `arch:` / `cluster:` |
+| **Each `*-mise` flavor** | Already has full Taskfile + mise pin (same Task version) |
+| **cluster** | Taskfile wraps `bin/setup` / `bin/compose` / `up:fred` |
+| **fred / george** | Light Taskfile (`setup`, `server`, `lint`) |
+
+```bash
+mise install && task                  # from umbrella
+task ubuntu:setup && task ubuntu:shell
+task cluster:up -- fred
+```
+
 ## Host UX (inside a flavor)
 
 | Command | Purpose |

@@ -1,0 +1,95 @@
+# Host UX for the docker-mise umbrella. Requires Task: https://taskfile.dev
+# Install: mise install   (see mise.toml)  or  https://taskfile.dev/installation/
+#
+# Includes each submodule’s Taskfile under a namespace:
+#   task ubuntu:setup
+#   task alpine:shell
+#   task arch:compose:app
+#   task cluster:up -- fred
+#
+# Umbrella-only helpers:
+#   task setup              # mise install (task + any other pins)
+#   task submodule:update   # init/update nested submodules
+#   task rebase-local       # HTTPS site: rebase local onto master (bin/rebase-local-tree)
+#   task status             # git status + submodule status
+
+version: "3"
+
+includes:
+  ubuntu:
+    taskfile: ./ubuntu-mise/Taskfile.yml
+    dir: ./ubuntu-mise
+    optional: true
+  alpine:
+    taskfile: ./alpine-mise/Taskfile.yml
+    dir: ./alpine-mise
+    optional: true
+  arch:
+    taskfile: ./arch-mise/Taskfile.yml
+    dir: ./arch-mise
+    optional: true
+  cluster:
+    taskfile: ./cluster/Taskfile.yml
+    dir: ./cluster
+    optional: true
+
+tasks:
+  default:
+    desc: List umbrella tasks (and included namespaces when present)
+    cmds:
+      - task --list
+
+  setup:
+    desc: Install host tools from mise.toml (includes Task)
+    cmds:
+      - |
+        if command -v mise >/dev/null 2>&1; then
+          mise trust . 2>/dev/null || true
+          mise install
+          mise reshim 2>/dev/null || true
+          echo "task: $(task --version 2>/dev/null || echo 'not on PATH — open a new shell or eval \"$(mise activate bash)\"')"
+        else
+          echo "error: mise not found; install from https://mise.jdx.dev or install Task directly" >&2
+          exit 1
+        fi
+
+  status:
+    desc: git status + submodule pins
+    cmds:
+      - git status -sb
+      - git submodule status
+      - |
+        if [[ -f cluster/.gitmodules ]]; then
+          echo "--- cluster apps ---"
+          git -C cluster submodule status 2>/dev/null || true
+        fi
+
+  submodule:update:
+    desc: Init/update all nested submodules (cluster → fred/george included)
+    aliases: [submodules]
+    cmds:
+      - git submodule sync --recursive
+      - git submodule update --init --recursive
+
+  submodule:status:
+    desc: Show submodule SHAs
+    cmds:
+      - git submodule status --recursive
+
+  rebase-local:
+    desc: "HTTPS site: fetch master + rebase local across the tree (bin/rebase-local-tree)"
+    cmds:
+      - ./bin/rebase-local-tree {{.CLI_ARGS}}
+
+  # Shortcuts into the multi-app cluster (same as task cluster:…)
+  cluster:up:
+    desc: "cluster: bin/compose up (task cluster:up -- fred)"
+    dir: ./cluster
+    cmds:
+      - ./bin/compose up {{.CLI_ARGS}}
+
+  cluster:setup:
+    desc: "cluster: bin/setup"
+    dir: ./cluster
+    cmds:
+      - ./bin/setup {{.CLI_ARGS}}
