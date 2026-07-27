@@ -65,7 +65,8 @@ Flavor repos also use **github** (default) + **gitlab** (backup). After cloning 
 
 For periodic upkeep (rebuilds, doc sync across flavors, dual-push, submodule pins), see **[MAINTAINING.md](./MAINTAINING.md)** and each flavor’s `AGENTS.md` maintainer section.
 
-SSH vs HTTPS dual context (same tree, different network policy): **[docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md)**.
+SSH vs HTTPS dual context (same tree, different network policy): **[docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md)**.  
+HTTPS site-local patches: keep a **`local`** branch and run **`bin/rebase-local-tree`** to pull `master` and rebase the whole submodule tree.
 
 ## Releases
 

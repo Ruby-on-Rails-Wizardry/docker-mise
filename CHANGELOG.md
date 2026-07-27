@@ -17,6 +17,7 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 ### Added
 
 - [docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md) — keep SSH remotes/`.gitmodules` canonical; HTTPS-only contexts use git `url.*.insteadOf` (nested submodules included); site-local **`local`** branch rebased onto **`master`** for proxy/CA image overrides
+- [bin/rebase-local-tree](bin/rebase-local-tree) — recursive fetch-`master` + rebase-`local` for the full nested submodule tree (HTTPS site helper)
 
 ### Changed
 

@@ -177,95 +177,44 @@ done
 
 Make your site-local commits **only on `local`** (small, focused commits rebase more cleanly).
 
-#### Recurring: pull master, then rebase `local`
+#### Recurring: use `bin/rebase-local-tree`
 
-**Order matters:** update **leaf** repos first (flavors / cluster / apps), then the **umbrella**.
+From the **umbrella** checkout (HTTPS machine):
 
 ```bash
-# 0) HTTPS context only; never force-push local to the public master remote
-
-# 1) Each repo that has a local branch (example list — edit to match your patches)
-rebase_local() {
-  local dir=$1
-  (
-    set -euo pipefail
-    cd "$dir"
-    git fetch origin master 2>/dev/null || git fetch github master
-    git checkout master
-    git pull --ff-only
-    git checkout local
-    git rebase master          # or: git rebase origin/master
-    echo "OK $dir local=$(git rev-parse --short HEAD) on master=$(git rev-parse --short master)"
-  )
-}
-
 cd /path/to/https-clone/docker-mise
-
-# Leaves first
-for d in ubuntu-mise alpine-mise arch-mise cluster; do
-  # skip if you never created local there
-  git -C "$d" show-ref --verify --quiet refs/heads/local || continue
-  rebase_local "$d"
-done
-
-# 2) Umbrella last
-rebase_local .
-
-# 3) If leaf SHAs changed, record new submodule pins on umbrella `local`
-git checkout local
-git add ubuntu-mise alpine-mise arch-mise cluster 2>/dev/null || true
-if ! git diff --cached --quiet; then
-  git commit -m "local: bump submodule pins after rebase onto master"
-fi
-
-# 4) Refresh nested app checkouts if cluster pins moved
-git submodule update --init --recursive
+bin/rebase-local-tree              # fetch master, rebase each `local`, pin bumps
+bin/rebase-local-tree --dry-run    # show plan only
 ```
+
+The script walks the **entire nested submodule tree** depth-first (e.g. `cluster/fred` before `cluster` before `.`):
+
+1. Fetch + fast-forward `master`  
+2. If branch `local` exists → `git rebase master`  
+3. On repos that have `local` and `.gitmodules`, auto-commit submodule pin bumps when SHAs moved  
+
+| Flag | Meaning |
+|------|---------|
+| `--dry-run` | Print actions only |
+| `--no-commit` | Rebase but do not commit pin bumps |
+| `--create-local` | Create `local` from `master` on umbrella + top-level children if missing |
+| `--all-create` | Create `local` in every repo (including nested apps) |
+| `--branch NAME` | Site branch (default `local`) |
+| `--master NAME` | Upstream branch (default `master`) |
 
 Conflict during rebase:
 
 ```bash
-# fix files, then:
-git add -A
-git rebase --continue
-# or abort this repo only:
-# git rebase --abort
+# fix files in the repo that failed, then:
+git -C path/to/repo add -A
+git -C path/to/repo rebase --continue
+# or:
+git -C path/to/repo rebase --abort
+# re-run:
+bin/rebase-local-tree
 ```
 
-#### Optional: one script on the HTTPS machine only
-
-Save as e.g. `~/bin/docker-mise-rebase-local` (do **not** commit proxy image names into public `master`):
-
-```bash
-#!/usr/bin/env bash
-# Rebase site-local branches onto updated master (HTTPS clone of docker-mise).
-set -euo pipefail
-ROOT="${1:-$PWD}"
-cd "$ROOT"
-
-rebase_local() {
-  local dir=$1
-  git -C "$dir" show-ref --verify --quiet refs/heads/local || return 0
-  echo "== rebase $dir =="
-  git -C "$dir" fetch origin master 2>/dev/null || git -C "$dir" fetch github master
-  git -C "$dir" checkout master
-  git -C "$dir" pull --ff-only
-  git -C "$dir" checkout local
-  git -C "$dir" rebase master
-}
-
-for d in ubuntu-mise alpine-mise arch-mise cluster .; do
-  rebase_local "$d"
-done
-
-git checkout local
-git add ubuntu-mise alpine-mise arch-mise cluster 2>/dev/null || true
-if ! git diff --cached --quiet 2>/dev/null; then
-  git commit -m "local: bump submodule pins after rebase onto master"
-fi
-git submodule update --init --recursive
-echo "Done. On umbrella: $(git branch --show-current) @ $(git rev-parse --short HEAD)"
-```
+Does **not** push. Do not push `local` to public `master`; use a private remote if you need a backup of site commits.
 
 #### Tips so rebases stay easy
 

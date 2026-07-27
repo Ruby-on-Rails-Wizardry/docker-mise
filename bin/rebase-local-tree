@@ -1,0 +1,290 @@
+#!/usr/bin/env bash
+# rebase-local-tree — HTTPS-site helper: update master + rebase `local` across the
+# full nested submodule tree (leaves first, then parents).
+#
+# Intended use (HTTPS-only / corporate proxy context):
+#   cd /path/to/docker-mise
+#   bin/rebase-local-tree
+#
+# For each git repo in the tree (depth-first, children before parent):
+#   1. Recurse into submodules listed in .gitmodules
+#   2. Fetch + fast-forward `master` from the upstream remote
+#   3. If branch `local` exists: checkout and `git rebase master`
+#   4. Else: leave checkout on updated `master`
+#   5. If on `local` and submodule gitlinks changed: commit pin bumps
+#
+# Does NOT push. Never force-pushes. Does not touch public remotes except fetch.
+#
+# Options:
+#   --dry-run          Print actions only
+#   --no-commit        Do not auto-commit submodule pin bumps on `local`
+#   --create-local     Create `local` from `master` where missing (umbrella + direct children only if set with --all-create)
+#   --all-create       With --create-local: create `local` in every repo (including nested apps)
+#   --branch NAME      Site branch name (default: local)
+#   --master NAME      Upstream branch name (default: master)
+#   -h, --help         This help
+#
+# See docs/CLONE-HTTPS.md
+
+set -euo pipefail
+
+DRY_RUN=0
+NO_COMMIT=0
+CREATE_LOCAL=0
+ALL_CREATE=0
+SITE_BRANCH=local
+MASTER_BRANCH=master
+ROOT=""
+
+usage() {
+  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+log() { printf '%s\n' "$*"; }
+run() {
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "  DRY: $*"
+    return 0
+  fi
+  log "  + $*"
+  "$@"
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 1
+}
+
+# Resolve a remote that can fetch MASTER_BRANCH (prefer github, then origin).
+pick_remote() {
+  local dir=$1
+  local r
+  for r in github origin; do
+    if git -C "$dir" remote get-url "$r" >/dev/null 2>&1; then
+      if git -C "$dir" ls-remote --heads "$r" "$MASTER_BRANCH" 2>/dev/null | grep -q .; then
+        printf '%s\n' "$r"
+        return 0
+      fi
+    fi
+  done
+  # Fall back to first remote that has the branch
+  while IFS= read -r r; do
+    [[ -z "$r" ]] && continue
+    if git -C "$dir" ls-remote --heads "$r" "$MASTER_BRANCH" 2>/dev/null | grep -q .; then
+      printf '%s\n' "$r"
+      return 0
+    fi
+  done < <(git -C "$dir" remote 2>/dev/null || true)
+  return 1
+}
+
+has_local_branch() {
+  local dir=$1
+  git -C "$dir" show-ref --verify --quiet "refs/heads/${SITE_BRANCH}"
+}
+
+list_submodule_paths() {
+  local dir=$1
+  if [[ ! -f "${dir}/.gitmodules" ]]; then
+    return 0
+  fi
+  git -C "$dir" config --file .gitmodules --get-regexp path 2>/dev/null \
+    | awk '{print $2}'
+}
+
+# Relative path from ROOT for display
+rel_from_root() {
+  local abs=$1
+  local rel="${abs#"${ROOT}/"}"
+  if [[ "$abs" == "$ROOT" ]]; then
+    printf '.\n'
+  else
+    printf '%s\n' "$rel"
+  fi
+}
+
+update_repo() {
+  local dir=$1
+  local rel
+  rel="$(rel_from_root "$dir")"
+
+  if [[ ! -d "${dir}/.git" && ! -f "${dir}/.git" ]]; then
+    log "== skip ${rel} (not a git checkout)"
+    return 0
+  fi
+
+  log "== ${rel}"
+
+  # --- children first ---
+  local sub
+  while IFS= read -r sub; do
+    [[ -z "$sub" ]] && continue
+    if [[ -d "${dir}/${sub}" ]]; then
+      update_repo "${dir}/${sub}"
+    else
+      log "  (missing submodule path ${sub}; run git submodule update --init)"
+    fi
+  done < <(list_submodule_paths "$dir")
+
+  local remote
+  if ! remote="$(pick_remote "$dir")"; then
+    die "${rel}: no remote with branch '${MASTER_BRANCH}' (configure origin/github and fetch access)"
+  fi
+  log "  remote=${remote}"
+
+  # Dirty worktree blocks rebase/checkout
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    if ! git -C "$dir" diff --quiet || ! git -C "$dir" diff --cached --quiet; then
+      die "${rel}: dirty worktree; commit or stash before rebasing"
+    fi
+    if [[ -n "$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null | head -1)" ]]; then
+      # Untracked files are ok if they don't collide; warn only
+      log "  note: untracked files present (ignored for dirty check)"
+    fi
+  fi
+
+  run git -C "$dir" fetch --tags --prune "$remote" "$MASTER_BRANCH"
+
+  # Update local master to match remote
+  if git -C "$dir" show-ref --verify --quiet "refs/heads/${MASTER_BRANCH}"; then
+    run git -C "$dir" checkout "$MASTER_BRANCH"
+  else
+    run git -C "$dir" checkout -B "$MASTER_BRANCH" "${remote}/${MASTER_BRANCH}"
+  fi
+
+  # Prefer ff-only onto remote tracking ref
+  if git -C "$dir" rev-parse --verify "${remote}/${MASTER_BRANCH}" >/dev/null 2>&1; then
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      log "  DRY: git -C $dir merge --ff-only ${remote}/${MASTER_BRANCH}"
+    else
+      log "  + git -C $dir merge --ff-only ${remote}/${MASTER_BRANCH}"
+      git -C "$dir" merge --ff-only "${remote}/${MASTER_BRANCH}" \
+        || die "${rel}: cannot fast-forward ${MASTER_BRANCH} (local master diverged?)"
+    fi
+  fi
+
+  if has_local_branch "$dir"; then
+    run git -C "$dir" checkout "$SITE_BRANCH"
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      log "  DRY: git -C $dir rebase ${MASTER_BRANCH}"
+    else
+      log "  + git -C $dir rebase ${MASTER_BRANCH}"
+      if ! git -C "$dir" rebase "$MASTER_BRANCH"; then
+        echo "error: ${rel}: rebase of '${SITE_BRANCH}' onto '${MASTER_BRANCH}' failed" >&2
+        echo "  Fix conflicts in ${dir}, then: git -C ${dir} rebase --continue" >&2
+        echo "  Or abort: git -C ${dir} rebase --abort" >&2
+        exit 1
+      fi
+    fi
+    log "  ${SITE_BRANCH}=$(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo '?') onto ${MASTER_BRANCH}=$(git -C "$dir" rev-parse --short "$MASTER_BRANCH" 2>/dev/null || echo '?')"
+  elif [[ "$CREATE_LOCAL" -eq 1 ]]; then
+    # Only create at root and top-level unless --all-create
+    local depth
+    depth="${rel//[^\/]/}"
+    depth=${#depth}
+    if [[ "$ALL_CREATE" -eq 1 || "$rel" == "." || "$depth" -eq 0 ]]; then
+      run git -C "$dir" checkout -B "$SITE_BRANCH" "$MASTER_BRANCH"
+      log "  created ${SITE_BRANCH} from ${MASTER_BRANCH}"
+    else
+      # top-level children: rel has no slash → depth 0 for "ubuntu-mise"
+      # rel "cluster/fred" has slash
+      if [[ "$rel" != */* ]]; then
+        run git -C "$dir" checkout -B "$SITE_BRANCH" "$MASTER_BRANCH"
+        log "  created ${SITE_BRANCH} from ${MASTER_BRANCH}"
+      else
+        run git -C "$dir" checkout "$MASTER_BRANCH"
+        log "  no ${SITE_BRANCH} (staying on ${MASTER_BRANCH})"
+      fi
+    fi
+  else
+    run git -C "$dir" checkout "$MASTER_BRANCH"
+    log "  no ${SITE_BRANCH} branch (staying on ${MASTER_BRANCH})"
+  fi
+
+  # Pin bump / warnings when submodule gitlinks differ after children updated
+  if [[ -f "${dir}/.gitmodules" ]]; then
+    local paths=()
+    while IFS= read -r sub; do
+      [[ -z "$sub" ]] && continue
+      paths+=("$sub")
+    done < <(list_submodule_paths "$dir")
+
+    if [[ "${#paths[@]}" -gt 0 ]]; then
+      if has_local_branch "$dir" && [[ "$NO_COMMIT" -eq 0 ]]; then
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+          log "  DRY: would stage submodule pins and commit if dirty"
+        else
+          git -C "$dir" checkout "$SITE_BRANCH" >/dev/null 2>&1 || true
+          git -C "$dir" add -- "${paths[@]}" 2>/dev/null || true
+          if ! git -C "$dir" diff --cached --quiet 2>/dev/null; then
+            git -C "$dir" commit -m "${SITE_BRANCH}: bump submodule pins after rebase onto ${MASTER_BRANCH}"
+            log "  committed submodule pin bump on ${SITE_BRANCH}"
+          fi
+        fi
+      elif [[ "$DRY_RUN" -eq 0 ]]; then
+        # No site branch: restore recorded pins so we don't leave a dirty parent
+        # (children that only have master tip checkouts get reset to the pin).
+        # Children with a rebased `local` are left checked out; parent stays dirty
+        # until you create `local` and commit pins.
+        local dirty=0
+        if ! git -C "$dir" diff --quiet -- "${paths[@]}" 2>/dev/null; then
+          dirty=1
+        fi
+        if [[ "$dirty" -eq 1 ]]; then
+          local child_has_local=0
+          local p
+          for p in "${paths[@]}"; do
+            if [[ -d "${dir}/${p}" ]] && has_local_branch "${dir}/${p}"; then
+              child_has_local=1
+              break
+            fi
+          done
+          if [[ "$child_has_local" -eq 1 ]]; then
+            log "  warning: submodule pins dirty and a child has '${SITE_BRANCH}'; create '${SITE_BRANCH}' here to record pins"
+          else
+            log "  restoring submodule pins to recorded commits (no '${SITE_BRANCH}' on this repo)"
+            git -C "$dir" submodule update --init -- "${paths[@]}"
+          fi
+        fi
+      fi
+    fi
+  fi
+}
+
+# --- args ---
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --no-commit) NO_COMMIT=1; shift ;;
+    --create-local) CREATE_LOCAL=1; shift ;;
+    --all-create) ALL_CREATE=1; CREATE_LOCAL=1; shift ;;
+    --branch) SITE_BRANCH=${2:?}; shift 2 ;;
+    --master) MASTER_BRANCH=${2:?}; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
+    -*)
+      die "unknown option: $1 (try --help)"
+      ;;
+    *)
+      ROOT=$(cd "$1" && pwd)
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$ROOT" ]]; then
+  # Prefer repo root containing this script's parent, else cwd
+  SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  if [[ -d "${SCRIPT_DIR}/../.git" || -f "${SCRIPT_DIR}/../.git" ]]; then
+    ROOT=$(cd "${SCRIPT_DIR}/.." && pwd)
+  else
+    ROOT=$(pwd)
+  fi
+fi
+
+ROOT=$(cd "$ROOT" && pwd)
+[[ -d "${ROOT}/.git" || -f "${ROOT}/.git" ]] || die "not a git repo: ${ROOT}"
+
+log "rebase-local-tree root=${ROOT} site_branch=${SITE_BRANCH} master=${MASTER_BRANCH} dry_run=${DRY_RUN}"
+update_repo "$ROOT"
+log "Done. Root now: $(git -C "$ROOT" branch --show-current) @ $(git -C "$ROOT" rev-parse --short HEAD)"
+log "Reminder: do not push ${SITE_BRANCH} to public ${MASTER_BRANCH}; use a private remote if you need a backup."

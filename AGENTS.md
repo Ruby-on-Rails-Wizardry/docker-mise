@@ -52,7 +52,8 @@ Clone: `git clone --recurse-submodules -b master git@github.com:Ruby-on-Rails-Wi
 
 Update pins: `git submodule update --remote --merge` (then commit parent).
 
-HTTPS-only environments: do **not** rewrite `.gitmodules` in git; use `url.*.insteadOf` on that host — **[docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md)**.
+HTTPS-only environments: do **not** rewrite `.gitmodules` in git; use `url.*.insteadOf` on that host — **[docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md)**.  
+Site-local image/proxy patches: branch **`local`** + **`bin/rebase-local-tree`** (does not push).
 
 ## Per-flavor remotes
 
