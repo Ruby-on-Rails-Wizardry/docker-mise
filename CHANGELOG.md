@@ -18,6 +18,8 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Changed
 
+- Pin [cluster/](cluster/) after converting **fred** / **george** to app submodules ([fred](https://github.com/Ruby-on-Rails-Wizardry/fred), [george](https://github.com/Ruby-on-Rails-Wizardry/george))
+
 ### Fixed
 
 ### Security
