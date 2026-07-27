@@ -24,6 +24,12 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
+## 2026-07-27 — pin cluster v0.3.0
+
+### Changed
+
+- Pin [cluster/](cluster/) to **v0.3.0** (ubuntu-mise base image + project mount at `/work`)
+
 ## 2026-07-27 — pin v0.4.3 / cluster v0.2.1
 
 ### Added
