@@ -5,3 +5,6 @@
 *.swp
 .idea/
 .vscode/
+
+# Local reference trees (not product)
+partial/

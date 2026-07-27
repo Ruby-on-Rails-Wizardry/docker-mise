@@ -16,20 +16,26 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Added
 
-- [bench/](bench/) cold/warm Rails bring-up speed harness (`bin/run-speed-tests`) and [SPEED.md](bench/SPEED.md)
-- Submodule [cluster/](cluster/) → [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) pinned at **v0.1.0** (multi-app template + nginx path proxy)
-- Pin [cluster/](cluster/) to master **38f015c** (Postgres/Redis, per-app DBs, nginx-first one-app `compose up`)
-
 ### Changed
-
-- Pin alpine-mise to **v0.4.1** (+ AGENTS.md Alpine docs fix) — musl Ruby compile; OS-only patch skew vs ubuntu/arch at v0.4.0
-- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.4.0**
 
 ### Fixed
 
 ### Security
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
+
+## 2026-07-27 — pin v0.4.2 / cluster v0.2.0
+
+### Added
+
+- [bench/](bench/) cold/warm Rails bring-up speed harness (`bin/run-speed-tests`) and [SPEED.md](bench/SPEED.md)
+- Submodule [cluster/](cluster/) → [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) **v0.2.0** (Postgres/Redis, nginx path proxy, one-app compose up)
+- Ignore local [partial/](partial/) reference tree in `.gitignore`
+
+### Changed
+
+- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.4.2**
+- Pin cluster to **v0.2.0**
 
 ## 2026-07-23 — pin v0.3.0
 
