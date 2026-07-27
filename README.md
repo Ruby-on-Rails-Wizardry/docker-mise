@@ -7,6 +7,7 @@ Umbrella repo for **mise** development base images. Each OS flavor is a **git su
 | [ubuntu-mise](https://github.com/Ruby-on-Rails-Wizardry/ubuntu-mise) | `git@github.com:Ruby-on-Rails-Wizardry/ubuntu-mise.git` | Ubuntu 24.04 + mise + `/cache` |
 | [alpine-mise](https://github.com/Ruby-on-Rails-Wizardry/alpine-mise) | `git@github.com:Ruby-on-Rails-Wizardry/alpine-mise.git` | Alpine + mise + `/cache` |
 | [arch-mise](https://github.com/Ruby-on-Rails-Wizardry/arch-mise) | `git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git` | Arch + mise + `/cache` |
+| [cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) | `git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git` | Multi-app Rails cluster template + nginx path proxy |
 
 ## Clone this umbrella
 
@@ -31,6 +32,17 @@ task setup && task shell
 ```
 
 See each submodule’s `README.md` for Task / Compose / cache details.
+
+## Multi-app cluster template
+
+```bash
+cd cluster
+bin/setup --docker-build
+bin/compose up
+# http://localhost:8080/  → home; /fred/ and /george/ via nginx
+```
+
+See [cluster/README.md](cluster/README.md).
 
 ## Remotes (this umbrella)
 

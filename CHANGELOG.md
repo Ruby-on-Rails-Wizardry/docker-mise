@@ -7,6 +7,7 @@ Flavor host UX and image changes are recorded in each flavor’s `CHANGELOG.md`:
 - [ubuntu-mise](https://github.com/Ruby-on-Rails-Wizardry/ubuntu-mise/blob/master/CHANGELOG.md)
 - [alpine-mise](https://github.com/Ruby-on-Rails-Wizardry/alpine-mise/blob/master/CHANGELOG.md)
 - [arch-mise](https://github.com/Ruby-on-Rails-Wizardry/arch-mise/blob/master/CHANGELOG.md)
+- [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster/blob/master/CHANGELOG.md) (`cluster/` submodule)
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Umbrella tags are optional; primary version tags live on the flavor repos. See [docs/RELEASE.md](docs/RELEASE.md).
@@ -16,6 +17,7 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 ### Added
 
 - [bench/](bench/) cold/warm Rails bring-up speed harness (`bin/run-speed-tests`) and [SPEED.md](bench/SPEED.md)
+- Submodule [cluster/](cluster/) → [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) pinned at **v0.1.0** (multi-app template + nginx path proxy)
 
 ### Changed
 
