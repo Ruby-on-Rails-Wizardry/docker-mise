@@ -18,6 +18,7 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 - [bench/](bench/) cold/warm Rails bring-up speed harness (`bin/run-speed-tests`) and [SPEED.md](bench/SPEED.md)
 - Submodule [cluster/](cluster/) → [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) pinned at **v0.1.0** (multi-app template + nginx path proxy)
+- Pin [cluster/](cluster/) to master **38f015c** (Postgres/Redis, per-app DBs, nginx-first one-app `compose up`)
 
 ### Changed
 
