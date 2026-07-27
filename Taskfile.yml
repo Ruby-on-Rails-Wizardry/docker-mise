@@ -81,15 +81,7 @@ tasks:
     cmds:
       - ./bin/rebase-local-tree {{.CLI_ARGS}}
 
-  # Shortcuts into the multi-app cluster (same as task cluster:…)
-  cluster:up:
-    desc: "cluster: bin/compose up (task cluster:up -- fred)"
-    dir: ./cluster
-    cmds:
-      - ./bin/compose up {{.CLI_ARGS}}
-
-  cluster:setup:
-    desc: "cluster: bin/setup"
-    dir: ./cluster
-    cmds:
-      - ./bin/setup {{.CLI_ARGS}}
+  # Cluster recipes live under the included namespace (see cluster/Taskfile.yml):
+  #   task cluster:setup
+  #   task cluster:up -- fred
+  #   task cluster:up:fred
