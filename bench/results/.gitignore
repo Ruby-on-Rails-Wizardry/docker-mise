@@ -1,2 +1,10 @@
 # Ephemeral compose overrides written by the harness
 .compose-dev-override-*.yml
+
+# Vim
+*~
+*.swp
+*.swo
+*.swn
+Session.vim
+.netrwhist

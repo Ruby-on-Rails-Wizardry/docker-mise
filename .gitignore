@@ -3,6 +3,10 @@
 .DS_Store
 *~
 *.swp
+*.swo
+*.swn
+Session.vim
+.netrwhist
 .idea/
 .vscode/
 

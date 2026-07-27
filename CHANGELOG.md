@@ -16,19 +16,29 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Added
 
-- [docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md) — keep SSH remotes/`.gitmodules` canonical; HTTPS-only contexts use git `url.*.insteadOf` (nested submodules included); site-local **`local`** branch rebased onto **`master`** for proxy/CA image overrides
-- [bin/rebase-local-tree](bin/rebase-local-tree) — recursive fetch-`master` + rebase-`local` for the full nested submodule tree (HTTPS site helper)
-- Root [Taskfile.yml](Taskfile.yml) + [mise.toml](mise.toml) pin **Task 3.52.0**; includes flavor/cluster Taskfiles (`task ubuntu:…`, `task cluster:up -- fred`, …)
-
 ### Changed
-
-- Pin [cluster/](cluster/) after converting **fred** / **george** to app submodules ([fred](https://github.com/Ruby-on-Rails-Wizardry/fred), [george](https://github.com/Ruby-on-Rails-Wizardry/george))
 
 ### Fixed
 
 ### Security
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
+
+## 2026-07-27 — pin v0.4.3 / cluster v0.2.1
+
+### Added
+
+- [docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md) — keep SSH remotes/`.gitmodules` canonical; HTTPS-only contexts use git `url.*.insteadOf` (nested submodules included); site-local **`local`** branch rebased onto **`master`** for proxy/CA image overrides
+- [bin/rebase-local-tree](bin/rebase-local-tree) — recursive fetch-`master` + rebase-`local` for the full nested submodule tree (HTTPS site helper)
+- Root [Taskfile.yml](Taskfile.yml) + [mise.toml](mise.toml) pin **Task 3.52.0**; includes flavor/cluster Taskfiles (`task ubuntu:…`, `task cluster:up -- fred`, …)
+
+### Changed
+
+- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.4.3**
+- Pin [cluster/](cluster/) to **v0.2.1**
+- Expand umbrella and `bench/results` `.gitignore` Vim artifact coverage
+
+### Fixed
 
 ## 2026-07-27 — pin v0.4.2 / cluster v0.2.0
 
