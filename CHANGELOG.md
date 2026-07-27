@@ -18,6 +18,8 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Changed
 
+- Document mise policy: **dev** = runtime + `/cache`; **prod default** = no mise; **if prod uses mise** = builder-only ([AGENTS.md](AGENTS.md), [cluster/AGENTS.md](cluster/AGENTS.md))
+
 ### Fixed
 
 ### Security
