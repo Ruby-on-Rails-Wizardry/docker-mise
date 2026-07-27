@@ -21,13 +21,15 @@ One `url.*.insteadOf` config covers **all levels** of submodule URLs.
 On the **HTTPS-only** machine or user account (**not** on your normal SSH workstation), set:
 
 ```bash
-# GitHub
-git config --global url."https://github.com/".insteadOf "git@github.com:"
-git config --global url."https://github.com/".insteadOf "ssh://git@github.com/"
+# Use --add so multiple insteadOf values stack (plain git config overwrites the same key).
 
-# GitLab (backup mirrors)
-git config --global url."https://gitlab.com/".insteadOf "git@gitlab.com:"
-git config --global url."https://gitlab.com/".insteadOf "ssh://git@gitlab.com/"
+# GitHub (scp-style and ssh:// URLs)
+git config --global --add url."https://github.com/".insteadOf "git@github.com:"
+git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
+
+# GitLab backup mirrors (separate url.* key — does not replace GitHub)
+git config --global --add url."https://gitlab.com/".insteadOf "git@gitlab.com:"
+git config --global --add url."https://gitlab.com/".insteadOf "ssh://git@gitlab.com/"
 ```
 
 | Stored in repo / `.gitmodules` | What that context uses |
@@ -36,6 +38,39 @@ git config --global url."https://gitlab.com/".insteadOf "ssh://git@gitlab.com/"
 | `git@gitlab.com:group/repo.git` | `https://gitlab.com/group/repo.git` |
 
 Do **not** add these rewrites on the SSH workstation, or every clone there will suddenly speak HTTPS.
+
+### Why `--add` (and why GitHub + GitLab both work)
+
+Git stores these as **multi-valued** keys under different sections:
+
+```ini
+[url "https://github.com/"]
+	insteadOf = git@github.com:
+	insteadOf = ssh://git@github.com/
+[url "https://gitlab.com/"]
+	insteadOf = git@gitlab.com:
+	insteadOf = ssh://git@gitlab.com/
+```
+
+- **GitHub vs GitLab** use different `url."<base>".insteadOf` keys (`https://github.com/` vs `https://gitlab.com/`). Setting both hosts is fine; neither replaces the other.
+- **Two patterns for one host** (e.g. `git@github.com:` and `ssh://git@github.com/`) share the **same** key. A second `git config` **without** `--add` replaces the first value. Always use `--add` when stacking.
+
+Verify:
+
+```bash
+git config --global --get-regexp '^url\..*\.insteadof$'
+# expect four lines if you set both hosts and both URL shapes
+```
+
+Reset and re-apply if you overwrote something:
+
+```bash
+git config --global --unset-all url."https://github.com/".insteadOf
+git config --global --unset-all url."https://gitlab.com/".insteadOf
+# then re-run the four --add lines above
+```
+
+Or edit `~/.gitconfig` by hand into the multi-`insteadOf` form shown above.
 
 ### Auth (HTTPS context)
 
