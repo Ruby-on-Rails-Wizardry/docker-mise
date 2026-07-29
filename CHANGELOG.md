@@ -24,6 +24,22 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
+## 2026-07-29 — pin flavors to v0.5.1
+
+### Changed
+
+- Pin [ubuntu-mise](ubuntu-mise/), [alpine-mise](alpine-mise/), [arch-mise](arch-mise/) to **v0.5.1** (compose creates named cache volume when missing)
+
+## Added
+
+### Changed
+
+### Fixed
+
+### Security
+
+<!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
+
 ## 2026-07-29 — pin flavors + cluster v0.5.0
 
 ### Changed
