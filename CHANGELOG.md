@@ -24,6 +24,27 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
+## 2026-07-29 — pin flavors + cluster v0.5.0
+
+### Changed
+
+- Pin [ubuntu-mise](ubuntu-mise/), [alpine-mise](alpine-mise/), [arch-mise](arch-mise/) to **v0.5.0** (home/ seed, ~/bin runtime tools, optional PG, host shell/TZ/matrix, compose hostnames)
+- Pin [cluster/](cluster/) to **v0.5.0** (docker/ layout, host TZ, compose hostnames)
+
+## Added
+
+- Note production topology: Kamal per app (fred/george) on one host; cluster compose is dev-only ([AGENTS.md](AGENTS.md), [cluster/AGENTS.md](cluster/AGENTS.md#production-deployment-kamal--not-compose))
+
+### Changed
+
+- Document supported host matrix for flavor UX: native Linux, native macOS, Windows+WSL (project inside WSL); not native Windows ([AGENTS.md](AGENTS.md))
+
+### Fixed
+
+### Security
+
+<!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
+
 ## 2026-07-27 — pin cluster v0.3.1
 
 ### Changed
