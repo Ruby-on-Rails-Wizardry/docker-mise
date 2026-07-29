@@ -24,6 +24,22 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
+## 2026-07-29 — pin ubuntu-mise v0.5.2
+
+### Changed
+
+- Pin [ubuntu-mise](ubuntu-mise/) to **v0.5.2** (libjemalloc/font/image/sqlite packages; postgresql setup early; apt upgrade before USER)
+
+## Added
+
+### Changed
+
+### Fixed
+
+### Security
+
+<!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
+
 ## 2026-07-29 — harden rebase-local-tree
 
 ### Changed
