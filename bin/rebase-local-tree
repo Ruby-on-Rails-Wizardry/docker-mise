@@ -8,21 +8,29 @@
 #
 # For each git repo in the tree (depth-first, children before parent):
 #   1. Recurse into submodules listed in .gitmodules
-#   2. Fetch + fast-forward `master` from the upstream remote
-#   3. If branch `local` exists: checkout and `git rebase master`
-#   4. Else: leave checkout on updated `master`
-#   5. If on `local` and submodule gitlinks changed: commit pin bumps
+#   2. If the worktree is dirty: auto **cache commit** WIP (unless --no-cache-commit)
+#   3. Fetch + fast-forward `master` from the upstream remote
+#   4. If branch `local` exists: checkout and `git rebase master`
+#   5. Else: leave checkout on updated `master`
+#   6. If on `local` and submodule gitlinks changed: commit pin bumps
+#
+# Fault tolerance:
+#   - Dirty trees → WIP cache commit, then continue (not a hard stop)
+#   - Per-repo failures are collected; siblings still run; non-zero exit if any failed
+#   - Fetch retries once; missing remote/branch skips that repo with an error entry
 #
 # Does NOT push. Never force-pushes. Does not touch public remotes except fetch.
 #
 # Options:
-#   --dry-run          Print actions only
-#   --no-commit        Do not auto-commit submodule pin bumps on `local`
-#   --create-local     Create `local` from `master` where missing (umbrella + direct children only if set with --all-create)
-#   --all-create       With --create-local: create `local` in every repo (including nested apps)
-#   --branch NAME      Site branch name (default: local)
-#   --master NAME      Upstream branch name (default: master)
-#   -h, --help         This help
+#   --dry-run            Print actions only
+#   --no-commit          Do not auto-commit submodule pin bumps on `local`
+#   --no-cache-commit    Fail on dirty worktrees instead of WIP cache commits
+#   --fail-fast          Stop on first repo error (default: continue, summarize)
+#   --create-local       Create `local` from `master` where missing (umbrella + top-level)
+#   --all-create         With --create-local: create `local` in every repo
+#   --branch NAME        Site branch name (default: local)
+#   --master NAME        Upstream branch name (default: master)
+#   -h, --help           This help
 #
 # See docs/CLONE-HTTPS.md
 
@@ -30,14 +38,21 @@ set -euo pipefail
 
 DRY_RUN=0
 NO_COMMIT=0
+NO_CACHE_COMMIT=0
+FAIL_FAST=0
 CREATE_LOCAL=0
 ALL_CREATE=0
 SITE_BRANCH=local
 MASTER_BRANCH=master
 ROOT=""
 
+# Collected outcomes (relative paths)
+declare -a FAILED_REPOS=()
+declare -a CACHE_COMMITTED=()
+declare -a SKIPPED_REPOS=()
+
 usage() {
-  sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 log() { printf '%s\n' "$*"; }
@@ -53,6 +68,16 @@ run() {
 die() {
   echo "error: $*" >&2
   exit 1
+}
+
+record_fail() {
+  local rel=$1
+  local msg=$2
+  FAILED_REPOS+=("${rel}: ${msg}")
+  echo "error: ${rel}: ${msg}" >&2
+  if [[ "$FAIL_FAST" -eq 1 ]]; then
+    exit 1
+  fi
 }
 
 # Resolve a remote that can fetch MASTER_BRANCH (prefer github, then origin).
@@ -103,6 +128,110 @@ rel_from_root() {
   fi
 }
 
+worktree_has_tracked_or_staged_changes() {
+  local dir=$1
+  ! git -C "$dir" diff --quiet 2>/dev/null \
+    || ! git -C "$dir" diff --cached --quiet 2>/dev/null
+}
+
+worktree_has_untracked() {
+  local dir=$1
+  [[ -n "$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null | head -1)" ]]
+}
+
+worktree_is_dirty() {
+  local dir=$1
+  worktree_has_tracked_or_staged_changes "$dir" || worktree_has_untracked "$dir"
+}
+
+rebase_in_progress() {
+  local dir=$1
+  local git_dir
+  git_dir="$(git -C "$dir" rev-parse --git-dir 2>/dev/null)" || return 1
+  # git-dir may be relative when -C is used
+  if [[ "${git_dir}" != /* ]]; then
+    git_dir="${dir}/${git_dir}"
+  fi
+  [[ -d "${git_dir}/rebase-merge" || -d "${git_dir}/rebase-apply" ]]
+}
+
+# Save WIP so checkout/rebase can proceed. Leaves a real commit on the current branch.
+cache_commit_if_dirty() {
+  local dir=$1
+  local rel=$2
+  local branch stamp
+
+  if ! worktree_is_dirty "$dir"; then
+    return 0
+  fi
+
+  if rebase_in_progress "$dir"; then
+    record_fail "$rel" "dirty worktree and a rebase is already in progress (finish or abort it first)"
+    return 1
+  fi
+
+  if [[ "$NO_CACHE_COMMIT" -eq 1 ]]; then
+    record_fail "$rel" "dirty worktree; commit/stash or omit --no-cache-commit"
+    return 1
+  fi
+
+  branch="$(git -C "$dir" branch --show-current 2>/dev/null || true)"
+  stamp="$(date -u +%Y-%m-%dT%H%MZ 2>/dev/null || date +%Y%m%d%H%M)"
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "  DRY: would cache-commit WIP on ${branch:-detached} (dirty worktree)"
+    return 0
+  fi
+
+  log "  dirty worktree → cache commit before branch changes"
+  # Respect .gitignore; include untracked site files that are not ignored.
+  if ! git -C "$dir" add -A; then
+    record_fail "$rel" "could not stage files for cache commit"
+    return 1
+  fi
+
+  if git -C "$dir" diff --cached --quiet 2>/dev/null; then
+    log "  note: nothing staged after add -A (dirty check may have been racey); continuing"
+    return 0
+  fi
+
+  if ! git -C "$dir" commit -m "local-cache: WIP before rebase-local-tree ${stamp}
+
+Auto-saved by bin/rebase-local-tree so fetch/checkout/rebase can proceed.
+Review, amend, squash, or reset this commit after the rebase finishes."; then
+    record_fail "$rel" "cache commit failed"
+    return 1
+  fi
+
+  CACHE_COMMITTED+=("${rel} @ $(git -C "$dir" rev-parse --short HEAD) (${branch:-detached})")
+  log "  cache-committed $(git -C "$dir" rev-parse --short HEAD) on ${branch:-detached HEAD}"
+  return 0
+}
+
+fetch_master() {
+  local dir=$1
+  local remote=$2
+  local rel=$3
+  local attempt
+
+  for attempt in 1 2; do
+    if [[ "$DRY_RUN" -eq 1 ]]; then
+      log "  DRY: git -C $dir fetch --tags --prune $remote $MASTER_BRANCH"
+      return 0
+    fi
+    log "  + git -C $dir fetch --tags --prune $remote $MASTER_BRANCH (try ${attempt})"
+    if git -C "$dir" fetch --tags --prune "$remote" "$MASTER_BRANCH"; then
+      return 0
+    fi
+    if [[ "$attempt" -eq 1 ]]; then
+      log "  fetch failed; retrying once…"
+      sleep 1
+    fi
+  done
+  record_fail "$rel" "fetch ${remote} ${MASTER_BRANCH} failed after retry"
+  return 1
+}
+
 update_repo() {
   local dir=$1
   local rel
@@ -110,46 +239,61 @@ update_repo() {
 
   if [[ ! -d "${dir}/.git" && ! -f "${dir}/.git" ]]; then
     log "== skip ${rel} (not a git checkout)"
+    SKIPPED_REPOS+=("${rel}: not a git checkout")
     return 0
   fi
 
   log "== ${rel}"
+
+  if rebase_in_progress "$dir"; then
+    record_fail "$rel" "rebase already in progress — finish (rebase --continue) or abort first"
+    return 0
+  fi
 
   # --- children first ---
   local sub
   while IFS= read -r sub; do
     [[ -z "$sub" ]] && continue
     if [[ -d "${dir}/${sub}" ]]; then
-      update_repo "${dir}/${sub}"
+      update_repo "${dir}/${sub}" || true
     else
       log "  (missing submodule path ${sub}; run git submodule update --init)"
     fi
   done < <(list_submodule_paths "$dir")
 
+  # If this repo is mid-rebase after children (shouldn't be), bail early
+  if rebase_in_progress "$dir"; then
+    record_fail "$rel" "rebase in progress after visiting children"
+    return 0
+  fi
+
   local remote
   if ! remote="$(pick_remote "$dir")"; then
-    die "${rel}: no remote with branch '${MASTER_BRANCH}' (configure origin/github and fetch access)"
+    record_fail "$rel" "no remote with branch '${MASTER_BRANCH}' (configure origin/github and fetch access)"
+    return 0
   fi
   log "  remote=${remote}"
 
-  # Dirty worktree blocks rebase/checkout
-  if [[ "$DRY_RUN" -eq 0 ]]; then
-    if ! git -C "$dir" diff --quiet || ! git -C "$dir" diff --cached --quiet; then
-      die "${rel}: dirty worktree; commit or stash before rebasing"
-    fi
-    if [[ -n "$(git -C "$dir" ls-files --others --exclude-standard 2>/dev/null | head -1)" ]]; then
-      # Untracked files are ok if they don't collide; warn only
-      log "  note: untracked files present (ignored for dirty check)"
-    fi
+  # Preserve WIP before any checkout/rebase
+  if ! cache_commit_if_dirty "$dir" "$rel"; then
+    return 0
   fi
 
-  run git -C "$dir" fetch --tags --prune "$remote" "$MASTER_BRANCH"
+  if ! fetch_master "$dir" "$remote" "$rel"; then
+    return 0
+  fi
 
   # Update local master to match remote
   if git -C "$dir" show-ref --verify --quiet "refs/heads/${MASTER_BRANCH}"; then
-    run git -C "$dir" checkout "$MASTER_BRANCH"
+    if ! run git -C "$dir" checkout "$MASTER_BRANCH"; then
+      record_fail "$rel" "checkout ${MASTER_BRANCH} failed"
+      return 0
+    fi
   else
-    run git -C "$dir" checkout -B "$MASTER_BRANCH" "${remote}/${MASTER_BRANCH}"
+    if ! run git -C "$dir" checkout -B "$MASTER_BRANCH" "${remote}/${MASTER_BRANCH}"; then
+      record_fail "$rel" "create/checkout ${MASTER_BRANCH} from ${remote}/${MASTER_BRANCH} failed"
+      return 0
+    fi
   fi
 
   # Prefer ff-only onto remote tracking ref
@@ -158,13 +302,22 @@ update_repo() {
       log "  DRY: git -C $dir merge --ff-only ${remote}/${MASTER_BRANCH}"
     else
       log "  + git -C $dir merge --ff-only ${remote}/${MASTER_BRANCH}"
-      git -C "$dir" merge --ff-only "${remote}/${MASTER_BRANCH}" \
-        || die "${rel}: cannot fast-forward ${MASTER_BRANCH} (local master diverged?)"
+      if ! git -C "$dir" merge --ff-only "${remote}/${MASTER_BRANCH}"; then
+        record_fail "$rel" "cannot fast-forward ${MASTER_BRANCH} (local master diverged?)"
+        return 0
+      fi
     fi
   fi
 
   if has_local_branch "$dir"; then
-    run git -C "$dir" checkout "$SITE_BRANCH"
+    if ! run git -C "$dir" checkout "$SITE_BRANCH"; then
+      record_fail "$rel" "checkout ${SITE_BRANCH} failed"
+      return 0
+    fi
+    # Second dirty check: unlikely after cache commit, but be safe before rebase
+    if ! cache_commit_if_dirty "$dir" "$rel"; then
+      return 0
+    fi
     if [[ "$DRY_RUN" -eq 1 ]]; then
       log "  DRY: git -C $dir rebase ${MASTER_BRANCH}"
     else
@@ -173,7 +326,8 @@ update_repo() {
         echo "error: ${rel}: rebase of '${SITE_BRANCH}' onto '${MASTER_BRANCH}' failed" >&2
         echo "  Fix conflicts in ${dir}, then: git -C ${dir} rebase --continue" >&2
         echo "  Or abort: git -C ${dir} rebase --abort" >&2
-        exit 1
+        record_fail "$rel" "rebase ${SITE_BRANCH} onto ${MASTER_BRANCH} failed (repo left for manual fix)"
+        return 0
       fi
     fi
     log "  ${SITE_BRANCH}=$(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo '?') onto ${MASTER_BRANCH}=$(git -C "$dir" rev-parse --short "$MASTER_BRANCH" 2>/dev/null || echo '?')"
@@ -183,21 +337,31 @@ update_repo() {
     depth="${rel//[^\/]/}"
     depth=${#depth}
     if [[ "$ALL_CREATE" -eq 1 || "$rel" == "." || "$depth" -eq 0 ]]; then
-      run git -C "$dir" checkout -B "$SITE_BRANCH" "$MASTER_BRANCH"
+      if ! run git -C "$dir" checkout -B "$SITE_BRANCH" "$MASTER_BRANCH"; then
+        record_fail "$rel" "create ${SITE_BRANCH} failed"
+        return 0
+      fi
       log "  created ${SITE_BRANCH} from ${MASTER_BRANCH}"
     else
-      # top-level children: rel has no slash → depth 0 for "ubuntu-mise"
-      # rel "cluster/fred" has slash
       if [[ "$rel" != */* ]]; then
-        run git -C "$dir" checkout -B "$SITE_BRANCH" "$MASTER_BRANCH"
+        if ! run git -C "$dir" checkout -B "$SITE_BRANCH" "$MASTER_BRANCH"; then
+          record_fail "$rel" "create ${SITE_BRANCH} failed"
+          return 0
+        fi
         log "  created ${SITE_BRANCH} from ${MASTER_BRANCH}"
       else
-        run git -C "$dir" checkout "$MASTER_BRANCH"
+        if ! run git -C "$dir" checkout "$MASTER_BRANCH"; then
+          record_fail "$rel" "checkout ${MASTER_BRANCH} failed"
+          return 0
+        fi
         log "  no ${SITE_BRANCH} (staying on ${MASTER_BRANCH})"
       fi
     fi
   else
-    run git -C "$dir" checkout "$MASTER_BRANCH"
+    if ! run git -C "$dir" checkout "$MASTER_BRANCH"; then
+      record_fail "$rel" "checkout ${MASTER_BRANCH} failed"
+      return 0
+    fi
     log "  no ${SITE_BRANCH} branch (staying on ${MASTER_BRANCH})"
   fi
 
@@ -217,8 +381,12 @@ update_repo() {
           git -C "$dir" checkout "$SITE_BRANCH" >/dev/null 2>&1 || true
           git -C "$dir" add -- "${paths[@]}" 2>/dev/null || true
           if ! git -C "$dir" diff --cached --quiet 2>/dev/null; then
-            git -C "$dir" commit -m "${SITE_BRANCH}: bump submodule pins after rebase onto ${MASTER_BRANCH}"
-            log "  committed submodule pin bump on ${SITE_BRANCH}"
+            if git -C "$dir" commit -m "${SITE_BRANCH}: bump submodule pins after rebase onto ${MASTER_BRANCH}"; then
+              log "  committed submodule pin bump on ${SITE_BRANCH}"
+            else
+              record_fail "$rel" "submodule pin commit failed"
+              return 0
+            fi
           fi
         fi
       elif [[ "$DRY_RUN" -eq 0 ]]; then
@@ -243,7 +411,10 @@ update_repo() {
             log "  warning: submodule pins dirty and a child has '${SITE_BRANCH}'; create '${SITE_BRANCH}' here to record pins"
           else
             log "  restoring submodule pins to recorded commits (no '${SITE_BRANCH}' on this repo)"
-            git -C "$dir" submodule update --init -- "${paths[@]}"
+            if ! git -C "$dir" submodule update --init -- "${paths[@]}"; then
+              record_fail "$rel" "submodule update --init failed while restoring pins"
+              return 0
+            fi
           fi
         fi
       fi
@@ -256,6 +427,8 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --no-commit) NO_COMMIT=1; shift ;;
+    --no-cache-commit) NO_CACHE_COMMIT=1; shift ;;
+    --fail-fast) FAIL_FAST=1; shift ;;
     --create-local) CREATE_LOCAL=1; shift ;;
     --all-create) ALL_CREATE=1; CREATE_LOCAL=1; shift ;;
     --branch) SITE_BRANCH=${2:?}; shift 2 ;;
@@ -284,7 +457,32 @@ fi
 ROOT=$(cd "$ROOT" && pwd)
 [[ -d "${ROOT}/.git" || -f "${ROOT}/.git" ]] || die "not a git repo: ${ROOT}"
 
-log "rebase-local-tree root=${ROOT} site_branch=${SITE_BRANCH} master=${MASTER_BRANCH} dry_run=${DRY_RUN}"
-update_repo "$ROOT"
+log "rebase-local-tree root=${ROOT} site_branch=${SITE_BRANCH} master=${MASTER_BRANCH} dry_run=${DRY_RUN} fail_fast=${FAIL_FAST} cache_commit=$([ "$NO_CACHE_COMMIT" -eq 0 ] && echo on || echo off)"
+update_repo "$ROOT" || true
+
+log ""
+log "── summary ──"
+if [[ "${#CACHE_COMMITTED[@]}" -gt 0 ]]; then
+  log "WIP cache commits:"
+  for _c in "${CACHE_COMMITTED[@]}"; do
+    log "  - ${_c}"
+  done
+fi
+if [[ "${#SKIPPED_REPOS[@]}" -gt 0 ]]; then
+  log "Skipped:"
+  for _s in "${SKIPPED_REPOS[@]}"; do
+    log "  - ${_s}"
+  done
+fi
+if [[ "${#FAILED_REPOS[@]}" -gt 0 ]]; then
+  log "Failed (${#FAILED_REPOS[@]}):"
+  for _f in "${FAILED_REPOS[@]}"; do
+    log "  - ${_f}"
+  done
+  log "Done with errors. Root: $(git -C "$ROOT" branch --show-current 2>/dev/null || echo '?') @ $(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo '?')"
+  log "Reminder: do not push ${SITE_BRANCH} to public ${MASTER_BRANCH}; use a private remote if you need a backup."
+  exit 1
+fi
+
 log "Done. Root now: $(git -C "$ROOT" branch --show-current) @ $(git -C "$ROOT" rev-parse --short HEAD)"
 log "Reminder: do not push ${SITE_BRANCH} to public ${MASTER_BRANCH}; use a private remote if you need a backup."

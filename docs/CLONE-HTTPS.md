@@ -185,6 +185,8 @@ From the **umbrella** checkout (HTTPS machine):
 cd /path/to/https-clone/docker-mise
 bin/rebase-local-tree              # fetch master, rebase each `local`, pin bumps
 bin/rebase-local-tree --dry-run    # show plan only
+# Dirty trees: auto WIP "local-cache:" commit before checkout/rebase (override: --no-cache-commit)
+# Per-repo errors: continue and summarize (stop early: --fail-fast)
 ```
 
 The script walks the **entire nested submodule tree** depth-first (e.g. `cluster/fred` before `cluster` before `.`):

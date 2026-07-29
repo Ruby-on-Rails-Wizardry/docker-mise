@@ -24,21 +24,18 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
+## 2026-07-29 — harden rebase-local-tree
+
+### Changed
+
+- [bin/rebase-local-tree](bin/rebase-local-tree): WIP **cache commit** on dirty trees before branch switch; continue-on-error summary; fetch retry; `--no-cache-commit` / `--fail-fast`
+- [docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md): document cache-commit and fail-fast behavior
+
 ## 2026-07-29 — pin flavors to v0.5.1
 
 ### Changed
 
 - Pin [ubuntu-mise](ubuntu-mise/), [alpine-mise](alpine-mise/), [arch-mise](arch-mise/) to **v0.5.1** (compose creates named cache volume when missing)
-
-## Added
-
-### Changed
-
-### Fixed
-
-### Security
-
-<!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
 ## 2026-07-29 — pin flavors + cluster v0.5.0
 
@@ -47,7 +44,7 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 - Pin [ubuntu-mise](ubuntu-mise/), [alpine-mise](alpine-mise/), [arch-mise](arch-mise/) to **v0.5.0** (home/ seed, ~/bin runtime tools, optional PG, host shell/TZ/matrix, compose hostnames)
 - Pin [cluster/](cluster/) to **v0.5.0** (docker/ layout, host TZ, compose hostnames)
 
-## Added
+### Added
 
 - Note production topology: Kamal per app (fred/george) on one host; cluster compose is dev-only ([AGENTS.md](AGENTS.md), [cluster/AGENTS.md](cluster/AGENTS.md#production-deployment-kamal--not-compose))
 
