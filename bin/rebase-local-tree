@@ -16,6 +16,8 @@
 #
 # Fault tolerance:
 #   - Dirty trees → WIP cache commit, then continue (not a hard stop)
+#   - Rebase conflicts → pause for you to fix files, then continue/abort/skip
+#     (TTY default; use --non-interactive to only record and move on)
 #   - Per-repo failures are collected; siblings still run; non-zero exit if any failed
 #   - Fetch retries once; missing remote/branch skips that repo with an error entry
 #
@@ -25,6 +27,7 @@
 #   --dry-run            Print actions only
 #   --no-commit          Do not auto-commit submodule pin bumps on `local`
 #   --no-cache-commit    Fail on dirty worktrees instead of WIP cache commits
+#   --non-interactive    Do not prompt on conflicts (record fail, continue tree)
 #   --fail-fast          Stop on first repo error (default: continue, summarize)
 #   --create-local       Create `local` from `master` where missing (umbrella + top-level)
 #   --all-create         With --create-local: create `local` in every repo
@@ -42,6 +45,8 @@ NO_CACHE_COMMIT=0
 FAIL_FAST=0
 CREATE_LOCAL=0
 ALL_CREATE=0
+# Prompt on rebase conflicts when stdin is a TTY (override with --non-interactive).
+INTERACTIVE=1
 SITE_BRANCH=local
 MASTER_BRANCH=master
 ROOT=""
@@ -50,9 +55,11 @@ ROOT=""
 declare -a FAILED_REPOS=()
 declare -a CACHE_COMMITTED=()
 declare -a SKIPPED_REPOS=()
+declare -a RESOLVED_REBASES=()
 
 usage() {
-  sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'
+  # Header comments only (stop at first non-comment line after the banner).
+  awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
 }
 
 log() { printf '%s\n' "$*"; }
@@ -155,6 +162,147 @@ rebase_in_progress() {
   [[ -d "${git_dir}/rebase-merge" || -d "${git_dir}/rebase-apply" ]]
 }
 
+conflicted_files() {
+  local dir=$1
+  git -C "$dir" diff --name-only --diff-filter=U 2>/dev/null || true
+}
+
+can_prompt() {
+  [[ "$INTERACTIVE" -eq 1 && "$DRY_RUN" -eq 0 && -t 0 && -t 1 ]]
+}
+
+# Pause so the user can fix conflicts; loop until rebase finishes or user aborts/skips.
+# Returns 0 if rebase completed successfully, 1 if abandoned (abort/skip/non-interactive fail).
+resolve_rebase_interactively() {
+  local dir=$1
+  local rel=$2
+  local ans=""
+  local unmerged=""
+
+  if ! can_prompt; then
+    echo "error: ${rel}: rebase stopped with conflicts (non-interactive)" >&2
+    echo "  Fix in ${dir}, then: git -C ${dir} rebase --continue" >&2
+    echo "  Or abort: git -C ${dir} rebase --abort" >&2
+    echo "  Re-run: bin/rebase-local-tree   (or finish this repo and continue)" >&2
+    record_fail "$rel" "rebase conflicts (non-interactive; left in progress)"
+    return 1
+  fi
+
+  while rebase_in_progress "$dir"; do
+    log ""
+    log "════════════════════════════════════════════════════════════"
+    log " Rebase conflict in: ${rel}"
+    log " Path: ${dir}"
+    log "════════════════════════════════════════════════════════════"
+    git -C "$dir" status --short 2>/dev/null || git -C "$dir" status 2>/dev/null || true
+    unmerged="$(conflicted_files "$dir")"
+    if [[ -n "${unmerged}" ]]; then
+      log ""
+      log "Unmerged paths:"
+      printf '%s\n' "${unmerged}" | sed 's/^/  • /'
+    fi
+    log ""
+    log "Resolve conflicts, then stage fixed files:"
+    log "  cd ${dir}"
+    log "  \$EDITOR <file>     # fix conflict markers"
+    log "  git add <file> …"
+    log ""
+    log "Then choose:"
+    log "  [c]ontinue  — git rebase --continue  (after git add)"
+    log "  [a]bort     — git rebase --abort     (undo this repo's rebase)"
+    log "  [s]kip      — leave mid-rebase; process other repos"
+    log "  [q]uit      — stop the whole tree walk (leave mid-rebase here)"
+    log "  [?]         — re-print status"
+    log ""
+
+    if ! read -r -p "Action [c/a/s/q/?]: " ans; then
+      log "  EOF on stdin — treating as skip"
+      record_fail "$rel" "rebase conflicts (EOF while prompting; left in progress)"
+      return 1
+    fi
+
+    case "${ans}" in
+      c|C|continue|"")
+        if [[ -n "$(conflicted_files "$dir")" ]]; then
+          log "  still have unmerged files — finish edits and git add before continue"
+          continue
+        fi
+        log "  + git -C ${dir} rebase --continue"
+        # Allow the user's editor for the commit message when needed.
+        if git -C "$dir" rebase --continue; then
+          if rebase_in_progress "$dir"; then
+            log "  rebase still in progress (another commit may conflict)"
+            continue
+          fi
+          RESOLVED_REBASES+=("${rel}")
+          log "  rebase finished successfully for ${rel}"
+          return 0
+        fi
+        if rebase_in_progress "$dir"; then
+          log "  rebase --continue failed or hit another conflict; fix and try again"
+          continue
+        fi
+        record_fail "$rel" "rebase --continue failed"
+        return 1
+        ;;
+      a|A|abort)
+        log "  + git -C ${dir} rebase --abort"
+        if git -C "$dir" rebase --abort; then
+          record_fail "$rel" "rebase aborted by user"
+          return 1
+        fi
+        record_fail "$rel" "rebase --abort failed"
+        return 1
+        ;;
+      s|S|skip)
+        log "  leaving rebase in progress in ${rel}; continuing other repos"
+        record_fail "$rel" "rebase left in progress (user skip)"
+        return 1
+        ;;
+      q|Q|quit)
+        log "Stopping tree walk. Finish or abort rebase in:"
+        log "  ${dir}"
+        exit 1
+        ;;
+      \?|h|H|help|status)
+        continue
+        ;;
+      *)
+        log "  unknown action: ${ans}"
+        ;;
+    esac
+  done
+
+  # Loop exited because rebase_in_progress is false
+  RESOLVED_REBASES+=("${rel}")
+  log "  rebase no longer in progress for ${rel}"
+  return 0
+}
+
+# Run rebase; on conflict, optionally hand off to the user.
+run_rebase_with_conflict_handling() {
+  local dir=$1
+  local rel=$2
+
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    log "  DRY: git -C $dir rebase ${MASTER_BRANCH}"
+    return 0
+  fi
+
+  log "  + git -C $dir rebase ${MASTER_BRANCH}"
+  if git -C "$dir" rebase "$MASTER_BRANCH"; then
+    return 0
+  fi
+
+  if rebase_in_progress "$dir"; then
+    resolve_rebase_interactively "$dir" "$rel"
+    return $?
+  fi
+
+  record_fail "$rel" "rebase ${SITE_BRANCH} onto ${MASTER_BRANCH} failed"
+  return 1
+}
+
 # Save WIP so checkout/rebase can proceed. Leaves a real commit on the current branch.
 cache_commit_if_dirty() {
   local dir=$1
@@ -246,8 +394,10 @@ update_repo() {
   log "== ${rel}"
 
   if rebase_in_progress "$dir"; then
-    record_fail "$rel" "rebase already in progress — finish (rebase --continue) or abort first"
-    return 0
+    log "  rebase already in progress — offering to resume"
+    if ! resolve_rebase_interactively "$dir" "$rel"; then
+      return 0
+    fi
   fi
 
   # --- children first ---
@@ -261,10 +411,12 @@ update_repo() {
     fi
   done < <(list_submodule_paths "$dir")
 
-  # If this repo is mid-rebase after children (shouldn't be), bail early
+  # Child walk may have left this repo alone, but if we are mid-rebase, resume
   if rebase_in_progress "$dir"; then
-    record_fail "$rel" "rebase in progress after visiting children"
-    return 0
+    log "  rebase in progress after children — offering to resume"
+    if ! resolve_rebase_interactively "$dir" "$rel"; then
+      return 0
+    fi
   fi
 
   local remote
@@ -318,17 +470,8 @@ update_repo() {
     if ! cache_commit_if_dirty "$dir" "$rel"; then
       return 0
     fi
-    if [[ "$DRY_RUN" -eq 1 ]]; then
-      log "  DRY: git -C $dir rebase ${MASTER_BRANCH}"
-    else
-      log "  + git -C $dir rebase ${MASTER_BRANCH}"
-      if ! git -C "$dir" rebase "$MASTER_BRANCH"; then
-        echo "error: ${rel}: rebase of '${SITE_BRANCH}' onto '${MASTER_BRANCH}' failed" >&2
-        echo "  Fix conflicts in ${dir}, then: git -C ${dir} rebase --continue" >&2
-        echo "  Or abort: git -C ${dir} rebase --abort" >&2
-        record_fail "$rel" "rebase ${SITE_BRANCH} onto ${MASTER_BRANCH} failed (repo left for manual fix)"
-        return 0
-      fi
+    if ! run_rebase_with_conflict_handling "$dir" "$rel"; then
+      return 0
     fi
     log "  ${SITE_BRANCH}=$(git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo '?') onto ${MASTER_BRANCH}=$(git -C "$dir" rev-parse --short "$MASTER_BRANCH" 2>/dev/null || echo '?')"
   elif [[ "$CREATE_LOCAL" -eq 1 ]]; then
@@ -428,6 +571,7 @@ while [[ $# -gt 0 ]]; do
     --dry-run) DRY_RUN=1; shift ;;
     --no-commit) NO_COMMIT=1; shift ;;
     --no-cache-commit) NO_CACHE_COMMIT=1; shift ;;
+    --non-interactive|--no-interactive) INTERACTIVE=0; shift ;;
     --fail-fast) FAIL_FAST=1; shift ;;
     --create-local) CREATE_LOCAL=1; shift ;;
     --all-create) ALL_CREATE=1; CREATE_LOCAL=1; shift ;;
@@ -457,7 +601,15 @@ fi
 ROOT=$(cd "$ROOT" && pwd)
 [[ -d "${ROOT}/.git" || -f "${ROOT}/.git" ]] || die "not a git repo: ${ROOT}"
 
-log "rebase-local-tree root=${ROOT} site_branch=${SITE_BRANCH} master=${MASTER_BRANCH} dry_run=${DRY_RUN} fail_fast=${FAIL_FAST} cache_commit=$([ "$NO_CACHE_COMMIT" -eq 0 ] && echo on || echo off)"
+# Non-TTY → no conflict prompts unless user forced interactive (they cannot)
+if [[ ! -t 0 || ! -t 1 ]]; then
+  if [[ "$INTERACTIVE" -eq 1 ]]; then
+    log "note: stdin/stdout is not a TTY — conflict prompts disabled (use a terminal or finish rebases manually)"
+    INTERACTIVE=0
+  fi
+fi
+
+log "rebase-local-tree root=${ROOT} site_branch=${SITE_BRANCH} master=${MASTER_BRANCH} dry_run=${DRY_RUN} fail_fast=${FAIL_FAST} interactive=${INTERACTIVE} cache_commit=$([ "$NO_CACHE_COMMIT" -eq 0 ] && echo on || echo off)"
 update_repo "$ROOT" || true
 
 log ""
@@ -466,6 +618,12 @@ if [[ "${#CACHE_COMMITTED[@]}" -gt 0 ]]; then
   log "WIP cache commits:"
   for _c in "${CACHE_COMMITTED[@]}"; do
     log "  - ${_c}"
+  done
+fi
+if [[ "${#RESOLVED_REBASES[@]}" -gt 0 ]]; then
+  log "Rebases finished after conflict resolution:"
+  for _r in "${RESOLVED_REBASES[@]}"; do
+    log "  - ${_r}"
   done
 fi
 if [[ "${#SKIPPED_REPOS[@]}" -gt 0 ]]; then

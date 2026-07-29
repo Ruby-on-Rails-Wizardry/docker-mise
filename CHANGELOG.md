@@ -28,8 +28,8 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Changed
 
-- [bin/rebase-local-tree](bin/rebase-local-tree): WIP **cache commit** on dirty trees before branch switch; continue-on-error summary; fetch retry; `--no-cache-commit` / `--fail-fast`
-- [docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md): document cache-commit and fail-fast behavior
+- [bin/rebase-local-tree](bin/rebase-local-tree): WIP **cache commit** on dirty trees; **interactive conflict resolution** (pause on conflicts: c/a/s/q); continue-on-error summary; fetch retry; `--no-cache-commit` / `--non-interactive` / `--fail-fast`
+- [docs/CLONE-HTTPS.md](docs/CLONE-HTTPS.md): document cache-commit, conflict prompts, and fail-fast behavior
 
 ## 2026-07-29 — pin flavors to v0.5.1
 

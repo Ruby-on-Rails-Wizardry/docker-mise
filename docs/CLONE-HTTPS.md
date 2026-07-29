@@ -186,6 +186,8 @@ cd /path/to/https-clone/docker-mise
 bin/rebase-local-tree              # fetch master, rebase each `local`, pin bumps
 bin/rebase-local-tree --dry-run    # show plan only
 # Dirty trees: auto WIP "local-cache:" commit before checkout/rebase (override: --no-cache-commit)
+# Conflicts: script pauses (TTY) so you can edit/add files, then [c]ontinue / [a]bort / [s]kip / [q]uit
+# Non-TTY or CI: --non-interactive (record fail, leave mid-rebase for manual fix)
 # Per-repo errors: continue and summarize (stop early: --fail-fast)
 ```
 
@@ -199,20 +201,39 @@ The script walks the **entire nested submodule tree** depth-first (e.g. `cluster
 |------|---------|
 | `--dry-run` | Print actions only |
 | `--no-commit` | Rebase but do not commit pin bumps |
+| `--no-cache-commit` | Fail on dirty worktrees instead of WIP cache commits |
+| `--non-interactive` | Do not prompt on conflicts (leave mid-rebase; continue tree) |
+| `--fail-fast` | Stop on first repo error |
 | `--create-local` | Create `local` from `master` on umbrella + top-level children if missing |
 | `--all-create` | Create `local` in every repo (including nested apps) |
 | `--branch NAME` | Site branch (default `local`) |
 | `--master NAME` | Upstream branch (default `master`) |
 
-Conflict during rebase:
+### Conflict during rebase
+
+**Interactive terminal (default):** the script **pauses**, lists unmerged paths, and waits:
+
+| Key | Action |
+|-----|--------|
+| **c** | After you edit + `git add`, run `git rebase --continue` |
+| **a** | `git rebase --abort` for this repo |
+| **s** | Leave mid-rebase; continue other repos |
+| **q** | Exit the whole tree walk |
 
 ```bash
-# fix files in the repo that failed, then:
-git -C path/to/repo add -A
+# In another terminal (or after the prompt):
+cd path/to/repo
+# fix conflict markers
+git add path/to/fixed-file
+# back at the script prompt: c
+```
+
+**Non-TTY / CI** (`--non-interactive`): conflicts are left mid-rebase; fix and re-run:
+
+```bash
+git -C path/to/repo add …
 git -C path/to/repo rebase --continue
-# or:
-git -C path/to/repo rebase --abort
-# re-run:
+# or: git -C path/to/repo rebase --abort
 bin/rebase-local-tree
 ```
 
