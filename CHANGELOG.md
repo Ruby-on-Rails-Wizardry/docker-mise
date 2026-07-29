@@ -24,6 +24,12 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
 
+## 2026-07-29 — pin flavors to v0.6.0
+
+### Changed
+
+- Pin [ubuntu-mise](ubuntu-mise/), [alpine-mise](alpine-mise/), and [arch-mise](arch-mise/) to **v0.6.0** (mise host UX / Taskfile mirrors, `.mise.env` PG 18 default; Alpine falls back to apk PG 17 when 18 missing)
+
 ## 2026-07-29 — pin ubuntu-mise v0.5.2
 
 ### Changed
