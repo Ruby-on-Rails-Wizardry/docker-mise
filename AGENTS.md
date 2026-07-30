@@ -33,10 +33,13 @@ docker-mise/
 ├── docs/
 │   └── RELEASE.md   # coordinated release checklist
 ├── README.md
-├── ubuntu-mise/   # submodule → Ruby-on-Rails-Wizardry/ubuntu-mise
-├── alpine-mise/   # submodule → Ruby-on-Rails-Wizardry/alpine-mise
-├── arch-mise/     # submodule → Ruby-on-Rails-Wizardry/arch-mise
-└── cluster/       # submodule → Ruby-on-Rails-Wizardry/docker-mise-cluster
+├── ubuntu-mise/     # submodule → Ruby-on-Rails-Wizardry/ubuntu-mise
+├── ubuntu-sample/   # submodule → sample_app (Rails exercise for ubuntu-mise)
+├── alpine-mise/     # submodule → Ruby-on-Rails-Wizardry/alpine-mise
+├── alpine-sample/   # submodule → sample_app (Rails exercise for alpine-mise)
+├── arch-mise/       # submodule → Ruby-on-Rails-Wizardry/arch-mise
+├── arch-sample/     # submodule → sample_app (Rails exercise for arch-mise)
+└── cluster/         # submodule → Ruby-on-Rails-Wizardry/docker-mise-cluster
 ```
 
 ## Submodules
@@ -46,6 +49,9 @@ docker-mise/
 | `ubuntu-mise` | `git@github.com:Ruby-on-Rails-Wizardry/ubuntu-mise.git` |
 | `alpine-mise` | `git@github.com:Ruby-on-Rails-Wizardry/alpine-mise.git` |
 | `arch-mise` | `git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git` |
+| `ubuntu-sample` | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` |
+| `alpine-sample` | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` |
+| `arch-sample` | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` |
 | `cluster` | `git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git` |
 
 Clone: `git clone --recurse-submodules -b master git@github.com:Ruby-on-Rails-Wizardry/docker-mise.git`

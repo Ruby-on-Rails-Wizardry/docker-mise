@@ -5,8 +5,11 @@ Umbrella repo for **mise** development base images. Each OS flavor is a **git su
 | Submodule | GitHub (default) | Purpose |
 |-----------|------------------|---------|
 | [ubuntu-mise](https://github.com/Ruby-on-Rails-Wizardry/ubuntu-mise) | `git@github.com:Ruby-on-Rails-Wizardry/ubuntu-mise.git` | Ubuntu 24.04 + mise + `/cache` |
+| [ubuntu-sample](https://github.com/Ruby-on-Rails-Wizardry/sample_app) | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` | Rails sample for `ubuntu-mise` compose `app` |
 | [alpine-mise](https://github.com/Ruby-on-Rails-Wizardry/alpine-mise) | `git@github.com:Ruby-on-Rails-Wizardry/alpine-mise.git` | Alpine + mise + `/cache` |
+| [alpine-sample](https://github.com/Ruby-on-Rails-Wizardry/sample_app) | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` | Rails sample for `alpine-mise` compose `app` |
 | [arch-mise](https://github.com/Ruby-on-Rails-Wizardry/arch-mise) | `git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git` | Arch + mise + `/cache` |
+| [arch-sample](https://github.com/Ruby-on-Rails-Wizardry/sample_app) | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` | Rails sample for `arch-mise` compose `app` |
 | [cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) | `git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git` | Multi-app Rails cluster template + nginx path proxy |
 
 ## Host UX (Task)
@@ -19,7 +22,7 @@ task                  # list umbrella + included namespaces
 task setup            # mise install
 task ubuntu:setup     # flavor tasks (includes ubuntu-mise/Taskfile.yml)
 task alpine:shell
-task arch:compose:app
+task arch:compose:shell
 task cluster:up -- fred
 task rebase-local     # HTTPS site helper (bin/rebase-local-tree)
 ```
@@ -46,11 +49,14 @@ Canonical remotes and `.gitmodules` use **SSH**. For a second machine or policy 
 
 ```bash
 cd ubuntu-mise   # or alpine-mise / arch-mise
-task setup && task shell
+task build && task shell          # build local image tag (compose never pulls it)
 # or: ./bin/setup && ./bin/shell
+PROJECT=../ubuntu-sample task shell   # sibling sample via PROJECT mount
 ```
 
-See each submodule’s `README.md` for Task / Compose / cache details.
+Compose uses **`pull_policy: never`** so the flavor tag (e.g. `ubuntu-mise:dev`) is local-only — build with `task build` / `bin/compose build`, never registry pull.
+
+See each flavor’s `README.md` for Task / Compose / cache details.
 
 ## Multi-app cluster template
 

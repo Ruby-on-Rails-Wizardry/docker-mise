@@ -9,7 +9,7 @@ Automated comparison of Rails bring-up paths under `docker-mise/bench`.
 | run_id | `20260724T152433Z-199361` |
 | started_at (UTC) | 2026-07-24T15:26:11Z |
 | host | niko |
-| sample_app | `/home/rob/Ruby-on-Rails-Wizardry/docker-mise/ubuntu-mise/sample_app` |
+| sample_app | `/home/rob/Ruby-on-Rails-Wizardry/docker-mise/ubuntu-sample` |
 | http_timeout_s | 600 |
 | source yaml | `20260724T152433Z-199361.yaml` |
 

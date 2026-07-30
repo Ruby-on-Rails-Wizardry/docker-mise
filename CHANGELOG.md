@@ -16,13 +16,31 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Added
 
+- Umbrella submodules **`ubuntu-sample`**, **`alpine-sample`**, **`arch-sample`** (Rails [sample_app](https://github.com/Ruby-on-Rails-Wizardry/sample_app); siblings of each `*-mise` flavor)
+
 ### Changed
+
+- Flavors no longer nest `sample_app`; sibling samples mount via `PROJECT=…`
+- Flavor compose is **dev-only** (no `app` service); **local image only** (`pull_policy: never`)
 
 ### Fixed
 
 ### Security
 
 <!-- Pin bumps: "Pin flavors to vX.Y.Z". -->
+
+## 2026-07-30 — pin flavors v0.7.0, cluster v0.6.0, samples
+
+### Added
+
+- Submodules **ubuntu-sample**, **alpine-sample**, **arch-sample** ([sample_app](https://github.com/Ruby-on-Rails-Wizardry/sample_app) host UX + dev/prod compose)
+
+### Changed
+
+- Pin [ubuntu-mise](ubuntu-mise/), [alpine-mise](alpine-mise/), [arch-mise](arch-mise/) to **v0.7.0** (sample out of flavor; local-only compose; flavor service/hostname)
+- Pin [cluster](cluster/) to **v0.6.0** (prebuilt ubuntu-mise:dev for fred/george; multi-app mise/Task)
+- Pin fred/george (via cluster) to host UX matching ubuntu-sample
+
 
 ## 2026-07-29 — pin flavors to v0.6.0
 

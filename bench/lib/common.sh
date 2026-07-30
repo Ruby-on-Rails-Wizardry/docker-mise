@@ -6,7 +6,7 @@ set -euo pipefail
 
 BENCH_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 UMBRELLA_ROOT="$(cd "${BENCH_ROOT}/.." && pwd)"
-SAMPLE_APP="${SAMPLE_APP:-${UMBRELLA_ROOT}/ubuntu-mise/sample_app}"
+SAMPLE_APP="${SAMPLE_APP:-${UMBRELLA_ROOT}/ubuntu-sample}"
 RESULTS_DIR="${RESULTS_DIR:-${BENCH_ROOT}/results}"
 RUN_ID="${RUN_ID:-}"
 HTTP_TIMEOUT_S="${HTTP_TIMEOUT_S:-600}"

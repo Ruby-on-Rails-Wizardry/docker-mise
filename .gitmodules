@@ -14,3 +14,15 @@
 	path = cluster
 	url = git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git
 	branch = master
+[submodule "ubuntu-sample"]
+	path = ubuntu-sample
+	url = git@github.com:Ruby-on-Rails-Wizardry/sample_app.git
+	branch = master
+[submodule "alpine-sample"]
+	path = alpine-sample
+	url = git@github.com:Ruby-on-Rails-Wizardry/sample_app.git
+	branch = master
+[submodule "arch-sample"]
+	path = arch-sample
+	url = git@github.com:Ruby-on-Rails-Wizardry/sample_app.git
+	branch = master

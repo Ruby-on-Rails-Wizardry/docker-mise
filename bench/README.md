@@ -8,7 +8,7 @@ Repeatable cold/warm timing for Rails bring-up paths used with this umbrella.
 |----------|------|
 | `sample_app_production` | sample_app Dockerfile **final** stage + Thruster (`:80`) |
 | `sample_app_development` | sample_app `compose.dev.yml` (**development** stage + live mount) |
-| `ubuntu-mise` / `alpine-mise` / `arch-mise` | Flavor image + compose profile **`app`** (sample_app mount + `/cache` volume) |
+| `ubuntu-mise` / `alpine-mise` / `arch-mise` | Flavor image + sibling **`ubuntu-sample`** / **`alpine-sample`** / **`arch-sample`** + `/cache` volume (`docker run`) |
 
 Each scenario runs **cold** then **warm**:
 
@@ -67,7 +67,7 @@ python3 bench/lib/report.py bench/results/<run_id>.yaml -o bench/SPEED.md
 
 - Docker + Compose plugin
 - `curl`, `python3`
-- Flavor `sample_app` submodules initialized for mise scenarios
+- Umbrella sample submodules (`ubuntu-sample`, …) initialized for mise scenarios
 - Network for cold gem/tool downloads
 
 A full five-scenario cold+warm run can take a long time (especially cold multi-stage Rails + three OS images). Start with `--only prod,dev` while iterating.

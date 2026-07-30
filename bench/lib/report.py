@@ -173,7 +173,7 @@ def main() -> int:
     lines.append("|----------|---------------|")
     lines.append("| sample_app production | `docker build` (final stage) + `docker run` Thruster/`rails server` on :80 |")
     lines.append("| sample_app development | `docker compose -f compose.dev.yml build` + `up` (live mount) |")
-    lines.append("| ubuntu/alpine/arch-mise | Flavor `bin/build` + `compose --profile app up app` (sample_app mount + `/cache` volume) |")
+    lines.append("| ubuntu/alpine/arch-mise | Flavor `bin/build` + `docker run` sibling sample + `/cache` volume |")
     lines.append("")
     lines.append("Bench uses **dedicated** image and volume names (`*:bench*`) so daily `:dev` images and `*-cache` volumes are left alone.")
     lines.append("")

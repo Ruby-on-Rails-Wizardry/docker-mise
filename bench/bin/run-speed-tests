@@ -231,28 +231,25 @@ EOF
   log "sample_app_development/${phase}: total=${t_root}s (build=${t_build}s up=${t_up}s root=${t_root}s)"
 }
 
-# --- flavor -mise compose app ------------------------------------------------
+# --- flavor -mise (sibling sample + local image via docker run) --------------
 
 scenario_mise_flavor() {
   local flavor="$1" phase="$2" host_port="$3"
   local flavor_root="${UMBRELLA_ROOT}/${flavor}"
+  local sample_name="${flavor%-mise}-sample"
+  local sample_root="${UMBRELLA_ROOT}/${sample_name}"
   local image="${flavor}:bench"
   local volume="${flavor}-bench-cache"
-  local project="${flavor}-bench"
+  local ctr="${flavor}-bench-app"
   local base="http://127.0.0.1:${host_port}"
   local start t_build t0 t_up t_root
 
   [[ -d "${flavor_root}" ]] || die "missing flavor root ${flavor_root}"
-  [[ -f "${flavor_root}/sample_app/Gemfile" ]] || die "${flavor}/sample_app missing Gemfile (init submodule)"
+  [[ -f "${sample_root}/Gemfile" ]] || die "missing ${sample_name}/Gemfile (umbrella submodule)"
 
   log "== ${flavor} / ${phase} =="
 
-  (
-    cd "${flavor_root}"
-    COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
-      SAMPLE_APP_HOST_PORT="${host_port}" SAMPLE_APP_PORT=3000 \
-      ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
-  )
+  docker rm -f "${ctr}" >/dev/null 2>&1 || true
 
   if [[ "${phase}" == "cold" ]]; then
     docker_rmi "${image}"
@@ -274,42 +271,43 @@ scenario_mise_flavor() {
   )
   t_build="$(elapsed_s "${t0}")"
 
-  log "compose app up"
-  (
-    cd "${flavor_root}"
-    export IMAGE="${image}" CACHE_VOLUME="${volume}"
-    export SAMPLE_APP_HOST_PORT="${host_port}" SAMPLE_APP_PORT=3000
-    export COMPOSE_PROJECT_NAME="${project}"
-    export SAMPLE_APP_DIR="${flavor_root}/sample_app"
-    ./bin/compose --profile app up -d --no-build app
-  )
+  log "docker run Rails sample (${sample_name})"
+  # Detached; same warm path as former compose app service (local image only).
+  docker run -d --name "${ctr}" \
+    -p "${host_port}:3000" \
+    -v "${sample_root}:/work:cached" \
+    -w /work \
+    -v "${volume}:/cache" \
+    -e "CACHE_ROOT=/cache" \
+    -e "PORT=3000" \
+    -e "RAILS_ENV=development" \
+    "${image}" \
+    bash -lc '
+      set -euo pipefail
+      eval "$(mise activate bash)"
+      if command -v cache-env >/dev/null 2>&1; then cache-env --ensure || true; fi
+      mise trust . 2>/dev/null || true
+      if [[ -f mise.toml ]] || [[ -f Gemfile ]]; then mise install; fi
+      export BUNDLE_CLEAN=false
+      bundle config set --local clean false 2>/dev/null || true
+      bundle check || bundle install --no-clean
+      bin/rails db:prepare
+      exec bin/rails server -b 0.0.0.0 -p 3000
+    '
 
   t_up="$(wait_http "${base}/up" "${start}")" || {
-    (
-      cd "${flavor_root}"
-      COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
-        ./bin/compose --profile app logs app --tail=50 >&2 || true
-      COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
-        ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
-    )
+    docker logs "${ctr}" --tail=50 >&2 || true
+    docker rm -f "${ctr}" >/dev/null 2>&1 || true
     record_failure "${flavor}" "${phase}" "timeout waiting for /up"
     return 1
   }
   t_root="$(wait_http "${base}/" "${start}")" || {
-    (
-      cd "${flavor_root}"
-      COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
-        ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
-    )
+    docker rm -f "${ctr}" >/dev/null 2>&1 || true
     record_failure "${flavor}" "${phase}" "timeout waiting for /"
     return 1
   }
 
-  (
-    cd "${flavor_root}"
-    COMPOSE_PROJECT_NAME="${project}" IMAGE="${image}" CACHE_VOLUME="${volume}" \
-      ./bin/compose --profile app down --remove-orphans >/dev/null 2>&1 || true
-  )
+  docker rm -f "${ctr}" >/dev/null 2>&1 || true
 
   RESULT_SCENARIO="${flavor}" \
   RESULT_PHASE="${phase}" \
