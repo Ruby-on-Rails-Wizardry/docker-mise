@@ -14,6 +14,13 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ## [Unreleased]
 
+## 2026-08-03 — pin flavors v0.8.1
+
+### Changed
+
+- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.8.1** (config/build/warm split; warm-sample)
+
+
 ### Added
 
 ### Changed
