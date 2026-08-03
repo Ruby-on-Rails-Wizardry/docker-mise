@@ -82,8 +82,8 @@ Supported host contexts for flavor/cluster `bin/*` (Unix shell + Docker):
 |-------|-----|
 | **Umbrella** | [Taskfile.yml](Taskfile.yml) + [mise.toml](mise.toml) `task = "3.52.0"`; `task setup`, includes `ubuntu:` / `alpine:` / `arch:` / `cluster:` |
 | **Each `*-mise` flavor** | Already has full Taskfile + mise pin (same Task version) |
-| **cluster** | Taskfile wraps `bin/setup` / `bin/compose` / `up:fred` |
-| **fred / george** | Light Taskfile (`setup`, `server`, `lint`) |
+| **cluster** | Taskfile wraps `bin/setup` / `bin/compose` / `up:fred` (also ron/harry/george) |
+| **fred / ron / harry / george** | Light Taskfile (`setup`, `server`, `lint`) inside cluster apps |
 
 ```bash
 mise install && task                  # from umbrella
@@ -116,8 +116,8 @@ Details and rationale: [cluster/AGENTS.md](cluster/AGENTS.md).
 | Layer | Role |
 |-------|------|
 | **cluster/** | **Dev only** — multi-app compose, path nginx, shared Postgres/Redis |
-| **fred / george** | **Production units** — each is a Rails 8 app with Kamal (`config/deploy.yml`, multi-stage Dockerfile, Thruster) |
+| **fred / ron / harry / george** | **Production units** — each is a Rails 8 app with Kamal (`config/deploy.yml`, multi-stage Dockerfile, Thruster) |
 
-**Locked topology:** two **independent Kamal apps on one VPS**; **kamal-proxy** routes by **hostname** (not cluster path prefixes). Deploy with `cd fred && bin/kamal deploy` (and likewise george), not `docker compose` of the cluster.
+**Locked topology:** **N independent Kamal apps on one VPS**; **kamal-proxy** routes by **hostname** (not cluster path prefixes). Deploy with `cd fred && bin/kamal deploy` (and likewise each sibling), not `docker compose` of the cluster.
 
 Full write-up: [cluster/AGENTS.md — Production deployment](cluster/AGENTS.md#production-deployment-kamal--not-compose).
