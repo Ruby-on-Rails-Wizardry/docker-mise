@@ -16,6 +16,22 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
 
 ### Added
 
+### Changed
+
+### Fixed
+
+### Security
+
+## 2026-08-03 — pin flavors v0.8.0, cluster v0.7.0
+
+### Changed
+
+- Pin ubuntu-mise, alpine-mise, arch-mise to **v0.8.0** (`/docker/bin`, volume **`cache`**, build-only identity)
+- Pin cluster to **v0.7.0** (four apps, single cache volume, `task warm`, compose.yml)
+
+
+### Added
+
 - Umbrella submodules **`ubuntu-sample`**, **`alpine-sample`**, **`arch-sample`** (Rails [sample_app](https://github.com/Ruby-on-Rails-Wizardry/sample_app); siblings of each `*-mise` flavor)
 
 ### Changed
