@@ -10,7 +10,6 @@ Umbrella repo for **mise** development base images. Each OS flavor is a **git su
 | [alpine-sample](https://github.com/Ruby-on-Rails-Wizardry/sample_app) | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` | Rails sample for `alpine-mise` compose `app` |
 | [arch-mise](https://github.com/Ruby-on-Rails-Wizardry/arch-mise) | `git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git` | Arch + mise + `/cache` |
 | [arch-sample](https://github.com/Ruby-on-Rails-Wizardry/sample_app) | `git@github.com:Ruby-on-Rails-Wizardry/sample_app.git` | Rails sample for `arch-mise` compose `app` |
-| [cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) | `git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git` | Multi-app Rails cluster template + nginx path proxy |
 
 ## Host UX (Task)
 
@@ -23,11 +22,10 @@ task setup            # mise install
 task ubuntu:setup     # flavor tasks (includes ubuntu-mise/Taskfile.yml)
 task alpine:shell
 task arch:compose:shell
-task cluster:up -- fred
 task rebase-local     # HTTPS site helper (bin/rebase-local-tree)
 ```
 
-Each flavor already has a full `Taskfile.yml` (`task setup` / `task shell` / `task compose:*`). Cluster and app repos have Taskfiles too. `bin/*` still works without Task.
+Each flavor already has a full `Taskfile.yml` (`task setup` / `task shell` / `task compose:*`). `bin/*` still works without Task.
 
 ## Clone this umbrella
 
@@ -60,14 +58,19 @@ See each flavor’s `README.md` for Task / Compose / cache details.
 
 ## Multi-app cluster template
 
+The multi-app product is a **standalone** repo (not a submodule of this umbrella), so Docker bind mounts and Bundler `local.*` path overrides keep gitdirs inside the project tree:
+
 ```bash
-cd cluster
-bin/setup --docker-build
-bin/compose up
-# http://localhost:8080/  → home; /fred/ and /george/ via nginx
+# sibling of this umbrella (recommended layout)
+cd ../docker-mise-cluster   # or: git clone --recurse-submodules \
+#   git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git
+task setup                  # or bin/setup
+task up:fred                # build ubuntu-mise:dev first if needed
+# http://localhost:8080/
 ```
 
-See [cluster/README.md](cluster/README.md).
+Repo: [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster).  
+Base image: sibling [ubuntu-mise](https://github.com/Ruby-on-Rails-Wizardry/ubuntu-mise) (`cd ../ubuntu-mise && task build`).
 
 ## Remotes (this umbrella)
 

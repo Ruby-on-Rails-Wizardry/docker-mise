@@ -10,10 +10,6 @@
 	path = arch-mise
 	url = git@github.com:Ruby-on-Rails-Wizardry/arch-mise.git
 	branch = master
-[submodule "cluster"]
-	path = cluster
-	url = git@github.com:Ruby-on-Rails-Wizardry/docker-mise-cluster.git
-	branch = master
 [submodule "ubuntu-sample"]
 	path = ubuntu-sample
 	url = git@github.com:Ruby-on-Rails-Wizardry/sample_app.git

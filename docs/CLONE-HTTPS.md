@@ -7,14 +7,17 @@ Some environments cannot use SSH (policy, CI, locked-down hosts). In those conte
 ## Nested tree (what gets rewritten)
 
 ```text
-docker-mise                 # umbrella
+docker-mise                 # umbrella (flavors + samples)
 ├── ubuntu-mise / alpine-mise / arch-mise
-└── cluster/                # docker-mise-cluster
-    ├── fred/
-    └── george/
+└── *-sample/
+
+# Separate clone (sibling), not a submodule of docker-mise:
+docker-mise-cluster/
+├── fred/ ron/ harry/ george/
+└── wizardry_shared/
 ```
 
-One `url.*.insteadOf` config covers **all levels** of submodule URLs.
+One `url.*.insteadOf` config covers **all levels** of submodule URLs in whichever tree you clone.
 
 ## Recommended: rewrite only where HTTPS is required
 
@@ -153,8 +156,8 @@ git submodule update --init --recursive
 |------|----------|---------|
 | **docker-mise** (umbrella) | tracks GitHub | optional: pin bumps after submodule rebases, umbrella-only tweaks |
 | **ubuntu-mise** / **alpine-mise** / **arch-mise** | tracks GitHub | Dockerfile / image `FROM` (and similar) for proxy+CA images |
-| **cluster** | tracks GitHub | same, if the cluster `Dockerfile` needs a different base |
-| **fred** / **george** | tracks GitHub | usually untouched |
+| **docker-mise-cluster** (sibling clone) | tracks GitHub | same, if the cluster `Dockerfile` needs a different base |
+| **fred** / **ron** / **harry** / **george** | tracks GitHub | usually untouched |
 
 One-time setup (HTTPS clone, after `insteadOf` + auth):
 
@@ -163,8 +166,8 @@ cd /path/to/https-clone/docker-mise
 git checkout master && git pull --ff-only
 git submodule update --init --recursive
 
-# Create local only where you will patch (example: flavors + cluster)
-for d in . ubuntu-mise alpine-mise arch-mise cluster; do
+# Create local only where you will patch (example: flavors)
+for d in . ubuntu-mise alpine-mise arch-mise; do
   (
     cd "$d"
     git fetch origin master 2>/dev/null || git fetch github master
@@ -173,6 +176,8 @@ for d in . ubuntu-mise alpine-mise arch-mise cluster; do
     git checkout -B local master    # or: git checkout -b local
   )
 done
+# Cluster is a separate clone:
+# cd ../docker-mise-cluster && git checkout -B local master
 ```
 
 Make your site-local commits **only on `local`** (small, focused commits rebase more cleanly).
@@ -191,7 +196,7 @@ bin/rebase-local-tree --dry-run    # show plan only
 # Per-repo errors: continue and summarize (stop early: --fail-fast)
 ```
 
-The script walks the **entire nested submodule tree** depth-first (e.g. `cluster/fred` before `cluster` before `.`):
+The script walks the **entire nested submodule tree** depth-first (e.g. flavor samples before flavors before `.`). Cluster apps live in the **docker-mise-cluster** clone, not under this umbrella:
 
 1. Fetch + fast-forward `master`  
 2. If branch `local` exists → `git rebase master`  
@@ -274,7 +279,7 @@ git submodule update --init --recursive
 |----------|-------------------------|
 | Committing `.gitmodules` flips SSH ↔ HTTPS | Constant churn; two contexts fight on every pull |
 | Dual URL remotes on every submodule “just in case” | Noise; still need rewrite or careful clone flags |
-| Editing remote URLs by hand in each nested repo | Easy to miss `cluster` → `fred` / `george` |
+| Editing remote URLs by hand in each nested repo | Easy to miss a flavor or sample |
 | Committing proxy/CA base-image changes on public **`master`** | Leaks site policy into the product; breaks SSH workstations |
 | Merging `master` into `local` forever (no rebase) | History becomes a tangle of “merge master” noise; harder to see real local patches |
 
@@ -282,4 +287,4 @@ git submodule update --init --recursive
 
 - Umbrella clone / remotes: [README.md](../README.md)  
 - Dual-push / mirrors: [MAINTAINING.md](../MAINTAINING.md)  
-- Cluster apps as submodules: [cluster/README.md](../cluster/README.md) (after `git submodule update --init`)  
+- Multi-app cluster (sibling repo): [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster)  

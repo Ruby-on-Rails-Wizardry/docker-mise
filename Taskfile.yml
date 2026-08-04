@@ -1,11 +1,12 @@
 # Host UX for the docker-mise umbrella. Requires Task: https://taskfile.dev
 # Install: mise install   (see mise.toml)  or  https://taskfile.dev/installation/
 #
-# Includes each submodule’s Taskfile under a namespace:
+# Includes each flavor submodule’s Taskfile under a namespace:
 #   task ubuntu:setup
 #   task alpine:shell
 #   task arch:compose:app
-#   task cluster:up -- fred
+#
+# Multi-app cluster is a sibling repo (../docker-mise-cluster), not a submodule.
 #
 # Umbrella-only helpers:
 #   task setup              # mise install (task + any other pins)
@@ -27,10 +28,6 @@ includes:
   arch:
     taskfile: ./arch-mise/Taskfile.yml
     dir: ./arch-mise
-    optional: true
-  cluster:
-    taskfile: ./cluster/Taskfile.yml
-    dir: ./cluster
     optional: true
 
 tasks:
@@ -58,14 +55,9 @@ tasks:
     cmds:
       - git status -sb
       - git submodule status
-      - |
-        if [[ -f cluster/.gitmodules ]]; then
-          echo "--- cluster apps ---"
-          git -C cluster submodule status 2>/dev/null || true
-        fi
 
   submodule:update:
-    desc: Init/update all nested submodules (cluster → fred/george included)
+    desc: Init/update all nested submodules (flavor trees)
     aliases: [submodules]
     cmds:
       - git submodule sync --recursive
@@ -81,7 +73,3 @@ tasks:
     cmds:
       - ./bin/rebase-local-tree {{.CLI_ARGS}}
 
-  # Cluster recipes live under the included namespace (see cluster/Taskfile.yml):
-  #   task cluster:setup
-  #   task cluster:up -- fred
-  #   task cluster:up:fred

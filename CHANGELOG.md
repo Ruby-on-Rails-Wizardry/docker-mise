@@ -7,12 +7,18 @@ Flavor host UX and image changes are recorded in each flavor’s `CHANGELOG.md`:
 - [ubuntu-mise](https://github.com/Ruby-on-Rails-Wizardry/ubuntu-mise/blob/master/CHANGELOG.md)
 - [alpine-mise](https://github.com/Ruby-on-Rails-Wizardry/alpine-mise/blob/master/CHANGELOG.md)
 - [arch-mise](https://github.com/Ruby-on-Rails-Wizardry/arch-mise/blob/master/CHANGELOG.md)
-- [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster/blob/master/CHANGELOG.md) (`cluster/` submodule)
+- [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster/blob/master/CHANGELOG.md) (standalone sibling repo)
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Umbrella tags are optional; primary version tags live on the flavor repos. See [docs/RELEASE.md](docs/RELEASE.md).
 
 ## [Unreleased]
+
+### Changed
+
+- Drop **`cluster/`** submodule — multi-app template is only the standalone
+  [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) repo
+  (recommended path: sibling `../docker-mise-cluster`)
 
 ## 2026-08-03 — pin flavors v0.8.1
 
