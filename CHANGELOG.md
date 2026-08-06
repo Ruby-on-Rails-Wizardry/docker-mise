@@ -20,6 +20,14 @@ Umbrella tags are optional; primary version tags live on the flavor repos. See [
   [docker-mise-cluster](https://github.com/Ruby-on-Rails-Wizardry/docker-mise-cluster) repo
   (recommended path: sibling `../docker-mise-cluster`)
 
+## 2026-08-06 — pin flavors v0.10.0
+
+### Changed
+
+- Pin **ubuntu-mise**, **alpine-mise**, **arch-mise** to **v0.10.0**
+  (`BASE_IMAGE` / `bin/private-sync` / GHE-tracked `base-image.env`;
+  ubuntu also ships `WORK_MOUNT`)
+
 ## 2026-08-03 — pin flavors v0.8.1
 
 ### Changed
